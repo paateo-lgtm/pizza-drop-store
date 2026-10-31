@@ -147,6 +147,9 @@ export function describeGrid(input: GridInput): GridSummary | null {
   };
 }
 
+/** Obergrenze gegen versehentlich riesige Raster (z. B. ein Jahr statt ein Abend). */
+export const MAX_SLOTS = 500;
+
 export type DropIssue = {
   path: "saleStartsAt" | "saleEndsAt" | "bakeEndsAt" | "maxPizzasTotal";
   message: string;
@@ -168,6 +171,11 @@ export function validateDropTimes(
     issues.push({
       path: "bakeEndsAt",
       message: "Der Backzeitraum ist zu kurz für eine Pizza",
+    });
+  } else if (grid.slotCount > MAX_SLOTS) {
+    issues.push({
+      path: "bakeEndsAt",
+      message: `Höchstens ${MAX_SLOTS} Slots pro Drop – bitte den Backzeitraum kürzen`,
     });
   }
   if (input.saleEndsAt <= input.saleStartsAt) {
@@ -231,14 +239,17 @@ export function slotStatus(
   return "free";
 }
 
-/** Freie Slots sperren bzw. gesperrte freigeben – nur in der Zukunft und solange der Drop nicht beendet ist. */
+/**
+ * Freie Slots sperren bzw. gesperrte freigeben – nur, solange der Slot noch nicht begonnen hat
+ * und der Drop nicht beendet ist.
+ */
 export function canToggleSlotBlock(
   status: SlotStatus,
-  slotEndsAt: Date,
+  slotStartsAt: Date,
   dropStatus: DropStatus,
   now: Date,
 ): boolean {
   if (dropStatus === "COMPLETED" || dropStatus === "CANCELLED") return false;
   if (status !== "free" && status !== "blocked") return false;
-  return slotEndsAt > now;
+  return slotStartsAt > now;
 }

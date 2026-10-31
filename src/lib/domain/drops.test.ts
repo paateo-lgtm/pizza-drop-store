@@ -5,6 +5,7 @@ import {
   dropActions,
   effectiveStatus,
   isGridLocked,
+  MAX_SLOTS,
   slotStatus,
   statusAfter,
   validateDropTimes,
@@ -260,6 +261,19 @@ describe("validateDropTimes", () => {
       "maxPizzasTotal",
     );
   });
+
+  it(`begrenzt das Raster auf ${MAX_SLOTS} Slots`, () => {
+    // 2 min pro Pizza: 1000 min = 500 Slots erlaubt, 1002 min = 501 nicht
+    const bake = (minutes: number) => ({
+      ...times,
+      saleEndsAt: times.bakeStartsAt,
+      bakeEndsAt: new Date(times.bakeStartsAt.getTime() + minutes * 60_000),
+      slotSeconds: 120,
+      maxPizzasTotal: null,
+    });
+    expect(paths(bake(1000))).toEqual([]);
+    expect(paths(bake(1002))).toContain("bakeEndsAt");
+  });
 });
 
 describe("slotStatus", () => {
@@ -348,6 +362,18 @@ describe("canToggleSlotBlock", () => {
 
   it("vergangene Slots nicht", () => {
     expect(canToggleSlotBlock("free", past, "LIVE", now)).toBe(false);
+  });
+
+  it("den Slot, der gerade im Ofen ist, nicht", () => {
+    // Slot 16:24–16:30 (UTC) läuft um 16:27 noch
+    expect(
+      canToggleSlotBlock(
+        "free",
+        at("2026-11-06T16:24:00Z"),
+        "LIVE",
+        at("2026-11-06T16:27:00Z"),
+      ),
+    ).toBe(false);
   });
 
   it("nicht in abgeschlossenen oder abgesagten Drops", () => {

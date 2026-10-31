@@ -11,7 +11,11 @@ type AuditEntry = {
     | "activate"
     | "deactivate"
     | "reorder"
-    | "login";
+    | "login"
+    | "status"
+    | "duplicate"
+    | "block"
+    | "unblock";
   entity: "pizza" | "ingredient" | "settings" | "user" | "drop";
   entityId?: string;
   diff?: Prisma.InputJsonValue;

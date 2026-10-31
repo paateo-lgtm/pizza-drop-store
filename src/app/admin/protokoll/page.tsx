@@ -13,6 +13,10 @@ const ACTIONS: Record<string, string> = {
   activate: "aktiviert",
   deactivate: "deaktiviert",
   reorder: "neu sortiert",
+  status: "Status geändert",
+  duplicate: "dupliziert",
+  block: "Slot gesperrt",
+  unblock: "Slot freigegeben",
 };
 
 const ENTITIES: Record<string, string> = {

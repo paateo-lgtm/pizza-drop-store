@@ -29,7 +29,7 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
   {
     title: "Betrieb",
     items: [
-      { href: "/admin/drops", label: "Drops", icon: CalendarClock, phase: 2 },
+      { href: "/admin/drops", label: "Drops", icon: CalendarClock },
       {
         href: "/admin/bestellungen",
         label: "Bestellungen",

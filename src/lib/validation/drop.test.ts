@@ -111,4 +111,11 @@ describe("dropSchema", () => {
       parse(form({}, [{ pizzaId: "p1", price: "", maxQuantity: "0" }])).success,
     ).toBe(false);
   });
+
+  it("meldet nicht-numerische Obergrenzen auf Deutsch", () => {
+    const issue = parse(form({ maxPizzasTotal: "viele" })).error?.issues.find(
+      (i) => i.path[0] === "maxPizzasTotal",
+    );
+    expect(issue?.message).toBe("Bitte eine ganze Zahl ab 1");
+  });
 });

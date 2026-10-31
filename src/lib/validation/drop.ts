@@ -19,7 +19,12 @@ const optionalInt = (min: number, max: number, message: string) =>
     .trim()
     .transform((v) => (v === "" ? null : Number(v)))
     .pipe(
-      z.number().int(message).min(min, message).max(max, message).nullable(),
+      z
+        .number({ error: message })
+        .int(message)
+        .min(min, message)
+        .max(max, message)
+        .nullable(),
     );
 
 const pizzaRow = z.object({
