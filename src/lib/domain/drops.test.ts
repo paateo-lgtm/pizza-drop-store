@@ -256,9 +256,9 @@ describe("validateDropTimes", () => {
 
   it("erlaubt keine Obergrenze über der Slotanzahl", () => {
     // 17–20 Uhr bei 6 min = 30 Slots
-    expect(
-      paths({ ...times, slotSeconds: 360, maxPizzasTotal: 31 }),
-    ).toContain("maxPizzasTotal");
+    expect(paths({ ...times, slotSeconds: 360, maxPizzasTotal: 31 })).toContain(
+      "maxPizzasTotal",
+    );
   });
 });
 
@@ -315,17 +315,17 @@ describe("slotStatus", () => {
       "PICKED_UP",
       "NO_SHOW",
     ] as const) {
-      expect(
-        slotStatus({ ...base, orderId: "o1", orderStatus }, now),
-      ).toBe("sold");
+      expect(slotStatus({ ...base, orderId: "o1", orderStatus }, now)).toBe(
+        "sold",
+      );
     }
   });
 
   it("frei bei abgelaufener, stornierter oder erstatteter Bestellung", () => {
     for (const orderStatus of ["EXPIRED", "CANCELLED", "REFUNDED"] as const) {
-      expect(
-        slotStatus({ ...base, orderId: "o1", orderStatus }, now),
-      ).toBe("free");
+      expect(slotStatus({ ...base, orderId: "o1", orderStatus }, now)).toBe(
+        "free",
+      );
     }
   });
 });
