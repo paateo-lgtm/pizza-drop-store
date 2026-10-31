@@ -12,6 +12,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.mts",
     "test:e2e": "playwright test",
     "db:start": "prisma dev -d -n pizza-drop -p 51217 -P 51218 --shadow-db-port 51219",
     "db:stop": "prisma dev stop pizza-drop",

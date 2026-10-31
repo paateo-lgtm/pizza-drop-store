@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: { tsconfigPaths: true },
@@ -7,6 +7,8 @@ export default defineConfig({
     // Fachlogik läuft in Node; Komponententests setzen per Kommentar `@vitest-environment jsdom`.
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}"],
+    // Datenbanktests: npm run test:integration
+    exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
     coverage: {
       include: ["src/lib/**"],
     },
