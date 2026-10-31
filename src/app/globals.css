@@ -1,0 +1,163 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+@custom-variant kitchen (&:is(.kitchen *));
+
+/* Toskana-Palette, siehe docs/DESIGN.md */
+:root {
+  --paper: #f7f2e8;
+  --surface: #fcfaf5;
+  --ink: #2b2620;
+  --ink-muted: #6f665a;
+  --line: #e3d9c6;
+  --olive: #5c6a3a;
+  --olive-deep: #3f4927;
+  --olive-soft: #dde2c9;
+  --terracotta: #a24a33;
+  --terracotta-soft: #f1d9cf;
+  --ochre: #b8893b;
+  --on-olive: #fcfaf5;
+  --wash: #efe8da;
+
+  --radius: 0.375rem;
+}
+
+/* Dunkles Theme für Kundenseite/Admin und Küchen-Theme teilen sich die Werte */
+.dark,
+.kitchen {
+  --paper: #1c1a16;
+  --surface: #25221d;
+  --ink: #f4efe4;
+  --ink-muted: #b5ac9c;
+  --line: #3a352d;
+  --olive: #a7b57a;
+  --olive-deep: #c3cf9a;
+  --olive-soft: #2f3522;
+  --terracotta: #e07a5f;
+  --terracotta-soft: #3d2620;
+  --ochre: #d9a955;
+  --on-olive: #1c1a16;
+  --wash: #2c2923;
+}
+
+/*
+ * shadcn/ui-Rollen auf die Palette abgebildet. Steht auch auf .dark/.kitchen,
+ * damit var() dort gegen die dunklen Werte aufgelöst wird.
+ */
+:root,
+.dark,
+.kitchen {
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--olive);
+  --primary-foreground: var(--on-olive);
+  --secondary: var(--olive-soft);
+  --secondary-foreground: var(--olive-deep);
+  --muted: var(--wash);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--olive-soft);
+  --accent-foreground: var(--olive-deep);
+  --destructive: var(--terracotta);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--olive);
+  --chart-1: var(--olive);
+  --chart-2: var(--terracotta);
+  --chart-3: var(--ochre);
+  --chart-4: #8a9a5b;
+  --chart-5: #6f665a;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--olive);
+  --sidebar-primary-foreground: var(--on-olive);
+  --sidebar-accent: var(--olive-soft);
+  --sidebar-accent-foreground: var(--olive-deep);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--olive);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-olive: var(--olive);
+  --color-olive-deep: var(--olive-deep);
+  --color-olive-soft: var(--olive-soft);
+  --color-terracotta: var(--terracotta);
+  --color-terracotta-soft: var(--terracotta-soft);
+  --color-ochre: var(--ochre);
+  --color-wash: var(--wash);
+
+  --font-sans: var(--font-dm-sans);
+  --font-serif: var(--font-cormorant);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-foreground;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-serif font-medium tracking-tight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

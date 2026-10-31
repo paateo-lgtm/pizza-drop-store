@@ -1,0 +1,373 @@
+// Datenmodell des Pizza Drop Store – siehe docs/PLAN.md, Abschnitt 3.1.
+// Geldbeträge in Cent (Int), Zeitpunkte als UTC (timestamptz).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Team ────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  KITCHEN
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String
+  passwordHash String
+  role         Role       @default(KITCHEN)
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now()) @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @db.Timestamptz
+  auditLogs    AuditLog[]
+}
+
+// ─── Pizzen & Rezepte ────────────────────────────────────────────────────
+
+enum Unit {
+  GRAM
+  MILLILITER
+  PIECE
+}
+
+model Ingredient {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  unit      Unit              @default(GRAM)
+  allergen  String?
+  pizzas    PizzaIngredient[]
+  createdAt DateTime          @default(now()) @db.Timestamptz
+}
+
+model Pizza {
+  id          String            @id @default(cuid())
+  slug        String            @unique
+  name        String
+  description String
+  imageUrl    String?
+  priceCents  Int
+  allergens   String[]
+  tags        String[]
+  active      Boolean           @default(true)
+  sortOrder   Int               @default(0)
+  createdAt   DateTime          @default(now()) @db.Timestamptz
+  updatedAt   DateTime          @updatedAt @db.Timestamptz
+  ingredients PizzaIngredient[]
+  drops       DropPizza[]
+  orderItems  OrderItem[]
+  tickets     KitchenTicket[]
+}
+
+model PizzaIngredient {
+  pizzaId        String
+  ingredientId   String
+  amountPerPizza Decimal    @db.Decimal(10, 2)
+  sortOrder      Int        @default(0)
+  pizza          Pizza      @relation(fields: [pizzaId], references: [id], onDelete: Cascade)
+  ingredient     Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@id([pizzaId, ingredientId])
+}
+
+// ─── Drops & Slots ───────────────────────────────────────────────────────
+
+enum DropStatus {
+  DRAFT
+  SCHEDULED
+  ON_SALE
+  SALE_CLOSED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Drop {
+  id                String           @id @default(cuid())
+  slug              String           @unique
+  title             String
+  status            DropStatus       @default(DRAFT)
+  saleStartsAt      DateTime         @db.Timestamptz
+  saleEndsAt        DateTime         @db.Timestamptz
+  bakeStartsAt      DateTime         @db.Timestamptz
+  bakeEndsAt        DateTime         @db.Timestamptz
+  /// Slotlänge = Zeit pro Pizza. Ab ON_SALE unveränderlich.
+  slotSeconds       Int
+  maxPizzasTotal    Int?
+  maxPizzasPerOrder Int              @default(4)
+  location          String?
+  notes             String?
+  createdAt         DateTime         @default(now()) @db.Timestamptz
+  updatedAt         DateTime         @updatedAt @db.Timestamptz
+  pizzas            DropPizza[]
+  slots             Slot[]
+  orders            Order[]
+  waitlist          WaitlistEntry[]
+  coupons           CouponDrop[]
+
+  @@index([status, saleStartsAt])
+}
+
+model DropPizza {
+  dropId             String
+  pizzaId            String
+  priceOverrideCents Int?
+  maxQuantity        Int?
+  sortOrder          Int    @default(0)
+  drop               Drop   @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  pizza              Pizza  @relation(fields: [pizzaId], references: [id], onDelete: Restrict)
+
+  @@id([dropId, pizzaId])
+}
+
+enum SlotState {
+  FREE
+  BLOCKED
+}
+
+/// 1 Slot = 1 Pizza. Belegt, wenn orderId gesetzt und (bezahlt oder reservedUntil in der Zukunft).
+model Slot {
+  id            String         @id @default(cuid())
+  dropId        String
+  seq           Int
+  startsAt      DateTime       @db.Timestamptz
+  endsAt        DateTime       @db.Timestamptz
+  state         SlotState      @default(FREE)
+  orderId       String?
+  reservedUntil DateTime?      @db.Timestamptz
+  drop          Drop           @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  order         Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  ticket        KitchenTicket?
+
+  @@unique([dropId, seq])
+  @@index([orderId])
+}
+
+// ─── Kunden & Bestellungen ───────────────────────────────────────────────
+
+model Customer {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  name         String
+  phone        String?
+  firstOrderAt DateTime?       @db.Timestamptz
+  createdAt    DateTime        @default(now()) @db.Timestamptz
+  orders       Order[]
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  IN_PROGRESS
+  READY
+  PICKED_UP
+  EXPIRED
+  CANCELLED
+  REFUNDED
+  NO_SHOW
+}
+
+model Order {
+  id                    String          @id @default(cuid())
+  number                Int             @unique @default(autoincrement())
+  dropId                String
+  customerId            String
+  status                OrderStatus     @default(PENDING_PAYMENT)
+  subtotalCents         Int
+  discountCents         Int             @default(0)
+  totalCents            Int
+  vatCents              Int
+  couponId              String?
+  pickupAt              DateTime        @db.Timestamptz
+  pickupCode            String          @unique
+  note                  String?
+  feedbackConsent       Boolean         @default(false)
+  stripeSessionId       String?         @unique
+  stripePaymentIntentId String?         @unique
+  expiresAt             DateTime        @db.Timestamptz
+  paidAt                DateTime?       @db.Timestamptz
+  pickedUpAt            DateTime?       @db.Timestamptz
+  createdAt             DateTime        @default(now()) @db.Timestamptz
+  updatedAt             DateTime        @updatedAt @db.Timestamptz
+  drop                  Drop            @relation(fields: [dropId], references: [id], onDelete: Restrict)
+  customer              Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  coupon                Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items                 OrderItem[]
+  slots                 Slot[]
+  tickets               KitchenTicket[]
+  refunds               Refund[]
+  feedback              Feedback?
+  waitlistConversion    WaitlistEntry[]
+
+  @@index([dropId, status])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id             String          @id @default(cuid())
+  orderId        String
+  pizzaId        String
+  nameSnapshot   String
+  unitPriceCents Int
+  quantity       Int
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  pizza          Pizza           @relation(fields: [pizzaId], references: [id], onDelete: Restrict)
+}
+
+enum TicketStatus {
+  QUEUED
+  PREP
+  OVEN
+  DONE
+}
+
+model KitchenTicket {
+  id            String       @id @default(cuid())
+  orderId       String
+  slotId        String       @unique
+  pizzaId       String
+  seq           Int
+  status        TicketStatus @default(QUEUED)
+  ovenStartedAt DateTime?    @db.Timestamptz
+  doneAt        DateTime?    @db.Timestamptz
+  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  slot          Slot         @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  pizza         Pizza        @relation(fields: [pizzaId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+}
+
+model Refund {
+  id             String   @id @default(cuid())
+  orderId        String
+  stripeRefundId String?  @unique
+  amountCents    Int
+  reason         String?
+  createdAt      DateTime @default(now()) @db.Timestamptz
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model ProcessedWebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now()) @db.Timestamptz
+}
+
+// ─── Marketing ───────────────────────────────────────────────────────────
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+model Coupon {
+  id             String       @id @default(cuid())
+  code           String       @unique
+  type           CouponType
+  /// Prozent (1–100) oder Betrag in Cent
+  value          Int
+  validFrom      DateTime?    @db.Timestamptz
+  validTo        DateTime?    @db.Timestamptz
+  maxRedemptions Int?
+  maxPerCustomer Int?
+  active         Boolean      @default(true)
+  stripeCouponId String?
+  createdAt      DateTime     @default(now()) @db.Timestamptz
+  drops          CouponDrop[]
+  orders         Order[]
+}
+
+/// Leere Zuordnung = Gutschein gilt für alle Drops.
+model CouponDrop {
+  couponId String
+  dropId   String
+  coupon   Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  drop     Drop   @relation(fields: [dropId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, dropId])
+}
+
+enum SubscriberStatus {
+  PENDING
+  CONFIRMED
+  UNSUBSCRIBED
+}
+
+model Subscriber {
+  id             String           @id @default(cuid())
+  email          String           @unique
+  status         SubscriberStatus @default(PENDING)
+  token          String           @unique
+  source         String?
+  confirmedAt    DateTime?        @db.Timestamptz
+  unsubscribedAt DateTime?        @db.Timestamptz
+  createdAt      DateTime         @default(now()) @db.Timestamptz
+}
+
+model WaitlistEntry {
+  id               String    @id @default(cuid())
+  dropId           String
+  email            String
+  quantity         Int
+  notifiedAt       DateTime? @db.Timestamptz
+  convertedOrderId String?
+  createdAt        DateTime  @default(now()) @db.Timestamptz
+  drop             Drop      @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  convertedOrder   Order?    @relation(fields: [convertedOrderId], references: [id], onDelete: SetNull)
+
+  @@unique([dropId, email])
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  rating    Int
+  comment   String?
+  /// Optional: { [pizzaId]: rating }
+  perPizza  Json?
+  createdAt DateTime @default(now()) @db.Timestamptz
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// ─── Inhalte, Einstellungen, Protokolle ──────────────────────────────────
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @db.Timestamptz
+}
+
+model SiteContent {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @db.Timestamptz
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  diff      Json?
+  createdAt DateTime @default(now()) @db.Timestamptz
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  kind      String
+  to        String
+  /// Verhindert Doppelversand, z. B. "drop-alarm:<dropId>:<subscriberId>"
+  dedupeKey String   @unique
+  providerId String?
+  createdAt DateTime @default(now()) @db.Timestamptz
+}
