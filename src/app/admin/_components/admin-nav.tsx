@@ -1,0 +1,139 @@
+"use client";
+
+import {
+  BarChart3,
+  CalendarClock,
+  ChefHat,
+  ClipboardList,
+  History,
+  LayoutDashboard,
+  Pizza,
+  Settings,
+  Users,
+  Wheat,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+
+type Item = {
+  href: string;
+  label: string;
+  icon: typeof Pizza;
+  /** Noch nicht umgesetzt: wird gedimmt und ohne Link angezeigt. */
+  phase?: number;
+};
+
+const SECTIONS: { title?: string; items: Item[] }[] = [
+  { items: [{ href: "/admin", label: "Übersicht", icon: LayoutDashboard }] },
+  {
+    title: "Betrieb",
+    items: [
+      { href: "/admin/drops", label: "Drops", icon: CalendarClock, phase: 2 },
+      {
+        href: "/admin/bestellungen",
+        label: "Bestellungen",
+        icon: ClipboardList,
+        phase: 4,
+      },
+      { href: "/kitchen", label: "Kitchen-Mode", icon: ChefHat, phase: 5 },
+    ],
+  },
+  {
+    title: "Sortiment",
+    items: [
+      { href: "/admin/pizzen", label: "Pizzen", icon: Pizza },
+      { href: "/admin/zutaten", label: "Zutaten", icon: Wheat },
+    ],
+  },
+  {
+    title: "Auswertung",
+    items: [
+      {
+        href: "/admin/reporting",
+        label: "Reporting",
+        icon: BarChart3,
+        phase: 8,
+      },
+    ],
+  },
+  {
+    title: "Verwaltung",
+    items: [
+      { href: "/admin/einstellungen", label: "Einstellungen", icon: Settings },
+      { href: "/admin/team", label: "Team", icon: Users },
+      { href: "/admin/protokoll", label: "Protokoll", icon: History },
+    ],
+  },
+];
+
+/** Aktiver Menüpunkt hängt an der URL; im vorgerenderten Gerüst steht die Navigation ohne Markierung. */
+export function AdminNav() {
+  return <NavItems pathname={usePathname()} />;
+}
+
+export function AdminNavFallback() {
+  return <NavItems pathname="" />;
+}
+
+function NavItems({ pathname }: { pathname: string }) {
+  return (
+    <nav aria-label="Admin-Navigation" className="flex flex-col gap-6">
+      {SECTIONS.map((section, i) => (
+        <div key={section.title ?? i}>
+          {section.title && (
+            <p className="mb-2 px-3 text-xs font-medium tracking-wide text-ink-muted uppercase">
+              {section.title}
+            </p>
+          )}
+          <ul className="flex flex-col gap-0.5">
+            {section.items.map((item) => {
+              const active =
+                item.href === "/admin"
+                  ? pathname === "/admin"
+                  : pathname.startsWith(item.href);
+              const Icon = item.icon;
+              const content = (
+                <>
+                  <Icon className="size-4" aria-hidden />
+                  <span className="flex-1">{item.label}</span>
+                  {item.phase && (
+                    <span className="text-[10px] text-ink-muted tabular-nums">
+                      Phase {item.phase}
+                    </span>
+                  )}
+                </>
+              );
+              const base =
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm";
+              return (
+                <li key={item.href}>
+                  {item.phase ? (
+                    <span
+                      className={cn(base, "cursor-default text-ink-muted/70")}
+                      aria-disabled
+                    >
+                      {content}
+                    </span>
+                  ) : (
+                    <Link
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        base,
+                        "transition-colors hover:bg-wash",
+                        active && "bg-olive-soft font-medium text-olive-deep",
+                      )}
+                    >
+                      {content}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+}

@@ -151,6 +151,14 @@
   h3 {
     @apply font-serif font-medium tracking-tight;
   }
+  /* Cormorant nutzt sonst Mediävalziffern; Zahlen sollen gleich hoch stehen. */
+  h1,
+  h2,
+  h3,
+  .font-serif {
+    --tw-numeric-figure: lining-nums;
+    font-variant-numeric: lining-nums;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

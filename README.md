@@ -24,6 +24,20 @@ npm run dev
 
 - Landingpage (Entwurf): http://localhost:3000
 - Kitchen-Mode (Entwurf): http://localhost:3000/entwurf/kueche
+- Team-Login: http://localhost:3000/login mit `admin@pizzadrop.test` oder `kueche@pizzadrop.test` und dem `SEED_PASSWORD` aus `.env`
+
+Die lokale Datenbank (`prisma dev`) erlaubt nur eine Verbindung gleichzeitig. Deshalb
+`DATABASE_POOL_MAX=1` setzen und Dev-Server und `npm run test:e2e` nicht parallel laufen lassen.
+
+## Produktion: ersten Admin anlegen
+
+Mit der `DATABASE_URL` der Produktionsdatenbank:
+
+```bash
+ADMIN_EMAIL=du@example.com ADMIN_NAME="Dein Name" ADMIN_PASSWORD="…" npm run admin:create
+```
+
+In Vercel müssen außerdem `DATABASE_URL` und `SESSION_SECRET` gesetzt sein.
 
 ## Befehle
 

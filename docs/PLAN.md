@@ -109,26 +109,26 @@
 
 ## 2. Tech-Stack
 
-| Bereich       | Wahl                                                                      | Begründung                                                                           |
-| ------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Framework     | **Next.js 15 (App Router) + TypeScript strict**                           | Kundenseite, Admin-Bereich und API in einem Projekt; passt optimal zu Vercel         |
-| Hosting       | **Vercel Pro**, Function-Region **fra1**                                  | Kommerzielle Nutzung ist nur ab Pro erlaubt (ca. 20 $/Monat); Cron minütlich möglich |
-| Datenbank     | **Neon Postgres** (Vercel Marketplace, Frankfurt)                         | Transaktionen, Branching für Previews                                                |
-| ORM           | **Prisma** mit Neon-Adapter                                               | Migrationen, Typsicherheit                                                           |
-| Zahlung       | **Stripe Checkout + Webhooks**                                            | Karte, Apple Pay, Google Pay; Rabatte über Stripe-Coupons; Erstattungen über die API |
-| Auth (Admin)  | **Auth.js v5** mit Rollen                                                 |                                                                                      |
-| Validierung   | **Zod**                                                                   |                                                                                      |
-| Live-Daten    | **TanStack Query** mit Polling (Küche 2–3 s, Statusseite 15 s)            | robust auf Vercel; Upgrade auf Pusher/Ably später möglich                            |
-| UI            | **Tailwind CSS v4 + shadcn/ui**, eigene Design-Tokens                     |                                                                                      |
-| Charts        | **Recharts**                                                              |                                                                                      |
-| E-Mails       | **Resend + React Email**                                                  | Transaktionsmails, Drop-Alarm (Batch-Versand), Feedback                              |
-| Bilder        | **Vercel Blob** + `next/image`                                            |                                                                                      |
-| Cron          | **Vercel Cron**                                                           | Drop-Alarm zum Verkaufsstart, Warteliste, Feedback-Mails, Aufräumen                  |
-| Rate-Limiting | **Upstash Redis** (Vercel Marketplace)                                    | Checkout, Login, Newsletter-Anmeldung                                                |
-| Datum/Zeit    | **date-fns + @date-fns/tz**, Speicherung in UTC, Anzeige Europe/Berlin    |                                                                                      |
-| PDF/Druck     | Druck-CSS (v1); `@react-pdf/renderer` bei Bedarf                          | Vorbereitungsliste                                                                   |
-| Tests         | **Vitest**, **Playwright**                                                |                                                                                      |
-| Qualität      | ESLint, Prettier, GitHub Actions, Vercel Preview pro Pull Request, Sentry |                                                                                      |
+| Bereich       | Wahl                                                                      | Begründung                                                                               |
+| ------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Framework     | **Next.js 15 (App Router) + TypeScript strict**                           | Kundenseite, Admin-Bereich und API in einem Projekt; passt optimal zu Vercel             |
+| Hosting       | **Vercel Pro**, Function-Region **fra1**                                  | Kommerzielle Nutzung ist nur ab Pro erlaubt (ca. 20 $/Monat); Cron minütlich möglich     |
+| Datenbank     | **Neon Postgres** (Vercel Marketplace, Frankfurt)                         | Transaktionen, Branching für Previews                                                    |
+| ORM           | **Prisma** mit Neon-Adapter                                               | Migrationen, Typsicherheit                                                               |
+| Zahlung       | **Stripe Checkout + Webhooks**                                            | Karte, Apple Pay, Google Pay; Rabatte über Stripe-Coupons; Erstattungen über die API     |
+| Auth (Admin)  | **Signiertes Session-Cookie (jose) + bcrypt** mit Rollen                  | Statt Auth.js (Phase 1): Muster aus der Next.js-16-Doku, schlanker für reinen Team-Login |
+| Validierung   | **Zod**                                                                   |                                                                                          |
+| Live-Daten    | **TanStack Query** mit Polling (Küche 2–3 s, Statusseite 15 s)            | robust auf Vercel; Upgrade auf Pusher/Ably später möglich                                |
+| UI            | **Tailwind CSS v4 + shadcn/ui**, eigene Design-Tokens                     |                                                                                          |
+| Charts        | **Recharts**                                                              |                                                                                          |
+| E-Mails       | **Resend + React Email**                                                  | Transaktionsmails, Drop-Alarm (Batch-Versand), Feedback                                  |
+| Bilder        | **Vercel Blob** + `next/image`                                            |                                                                                          |
+| Cron          | **Vercel Cron**                                                           | Drop-Alarm zum Verkaufsstart, Warteliste, Feedback-Mails, Aufräumen                      |
+| Rate-Limiting | **Upstash Redis** (Vercel Marketplace)                                    | Checkout, Login, Newsletter-Anmeldung                                                    |
+| Datum/Zeit    | **date-fns + @date-fns/tz**, Speicherung in UTC, Anzeige Europe/Berlin    |                                                                                          |
+| PDF/Druck     | Druck-CSS (v1); `@react-pdf/renderer` bei Bedarf                          | Vorbereitungsliste                                                                       |
+| Tests         | **Vitest**, **Playwright**                                                |                                                                                          |
+| Qualität      | ESLint, Prettier, GitHub Actions, Vercel Preview pro Pull Request, Sentry |                                                                                          |
 
 ---
 
@@ -247,7 +247,7 @@ Nebenzweige: `EXPIRED`, `CANCELLED`, `REFUNDED`, `NO_SHOW`.
 | Phase                            | Inhalt                                                                                                                                                                         | Tage | ECC-Skills / Agents                                                                                          |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------------------------------------ |
 | **0 Setup & Design**             | Repo, Next.js, Tailwind v4, shadcn/ui, Vercel + Neon, Prisma-Seed, Vitest/Playwright, CI, Design-Tokens, Moodboard und Mockups von Landingpage und Kitchen-Mode zur Abstimmung | 3    | `/ecc:project-init`, `frontend-design-direction`, `design-system`, `nextjs-turbopack`, `deployment-patterns` |
-| **1 Fundament Admin**            | Prisma-Schema, Auth.js mit Rollen, Admin-Layout, Pizza-Konfigurator mit Rezept und Zutaten, Einstellungen, Audit-Log                                                           | 4    | `prisma-patterns`, `postgres-patterns`, `ecc:database-reviewer`, `/ecc:code-review`                          |
+| **1 Fundament Admin**            | Prisma-Schema, Team-Login mit Rollen, Admin-Layout, Pizza-Konfigurator mit Rezept und Zutaten, Einstellungen, Audit-Log                                                        | 4    | `prisma-patterns`, `postgres-patterns`, `ecc:database-reviewer`, `/ecc:code-review`                          |
 | **2 Slots & Drops**              | `lib/domain/slots` per TDD (Raster, Suche nach n Slots am Stück, Sperren, Ablauf, Sommerzeit); Drop-CRUD, Status-Workflow, Vorschau, Slot-Raster-Ansicht, Duplizieren          | 5    | `tdd-workflow`, `ecc:tdd-guide`, `typescript-patterns`, `ecc:typescript-reviewer`                            |
 | **3 Kundenseite & Reservierung** | Landingpage, Drop-Seite, Auswahl der Abholzeit, atomare Reservierung mit Nebenläufigkeitstest (20 parallele Checkouts), Mobile-first                                           | 5    | `frontend-patterns`, `react-patterns`, `/ecc:react-review`, `accessibility`                                  |
 | **4 Zahlung & Mails**            | Stripe Checkout, Webhook mit Idempotenz, Statusseite und QR-Code, Bestätigungs- und Storno-Mails, Storno mit Erstattung                                                        | 4    | `api-design`, `error-handling`, `ecc:security-reviewer`, `ecc:silent-failure-hunter`                         |

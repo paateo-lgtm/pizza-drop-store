@@ -51,3 +51,6 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# lokale Uploads (Produktion: Vercel Blob)
+/public/uploads/

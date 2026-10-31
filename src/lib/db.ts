@@ -7,7 +7,13 @@ function createClient() {
   if (!connectionString) {
     throw new Error("DATABASE_URL ist nicht gesetzt");
   }
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  return new PrismaClient({
+    adapter: new PrismaPg({
+      connectionString,
+      // Lokal (prisma dev) ist nur eine Verbindung gleichzeitig möglich, siehe .env.example.
+      max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+    }),
+  });
 }
 
 // In der Entwicklung über Hot-Reloads hinweg nur eine Verbindung aufbauen.

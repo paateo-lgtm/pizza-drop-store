@@ -19,6 +19,7 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
       SEED_PASSWORD: ci-only-password
+      SESSION_SECRET: ci-only-session-secret-with-at-least-32-chars
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

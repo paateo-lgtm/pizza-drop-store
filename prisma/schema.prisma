@@ -24,6 +24,8 @@ model User {
   passwordHash String
   role         Role       @default(KITCHEN)
   active       Boolean    @default(true)
+  /// Wird bei Passwort-, Rollen- oder Statusänderung erhöht und beendet damit alle Sitzungen.
+  sessionVersion Int      @default(0)
   createdAt    DateTime   @default(now()) @db.Timestamptz
   updatedAt    DateTime   @updatedAt @db.Timestamptz
   auditLogs    AuditLog[]
