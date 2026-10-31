@@ -159,6 +159,15 @@ export async function saveDrop(
             "Abgeschlossene oder abgesagte Drops lassen sich nicht mehr ändern.",
         });
       }
+      if (existing.status !== "DRAFT" && values.slug !== existing.slug) {
+        // Der Kurzname steht in der Adresse der öffentlichen Drop-Seite.
+        throw new ActionError({
+          ok: false,
+          message:
+            "Der Kurzname ist Teil der öffentlichen Adresse und bleibt nach dem Veröffentlichen fix.",
+          fieldErrors: { slug: ["Nach dem Veröffentlichen fix"] },
+        });
+      }
       const gridChanged =
         existing.bakeStartsAt.getTime() !== values.bakeStartsAt.getTime() ||
         existing.bakeEndsAt.getTime() !== values.bakeEndsAt.getTime() ||

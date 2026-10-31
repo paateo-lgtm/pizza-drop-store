@@ -189,7 +189,8 @@ export function priceBreakdown(
   };
 }
 
-const ACTIVE: OrderStatus[] = [
+/** Bestellungen, die ihre Slots und Kontingente endgültig belegen. */
+export const SOLD_ORDER_STATUSES: OrderStatus[] = [
   "PAID",
   "IN_PROGRESS",
   "READY",
@@ -203,7 +204,7 @@ export function isOrderActive(
   expiresAt: Date,
   now: Date,
 ): boolean {
-  if (ACTIVE.includes(status)) return true;
+  if (SOLD_ORDER_STATUSES.includes(status)) return true;
   return status === "PENDING_PAYMENT" && expiresAt.getTime() > now.getTime();
 }
 

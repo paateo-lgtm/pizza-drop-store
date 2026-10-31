@@ -51,6 +51,7 @@ async function EditDrop({
       <PageHeader title={drop.title} description="Drop bearbeiten" />
       <DropForm
         gridLocked={isGridLocked(status)}
+        slugLocked={drop.status !== "DRAFT"}
         pizzas={pizzas}
         initial={{
           id: drop.id,

@@ -41,11 +41,14 @@ export function DropForm({
   initial,
   pizzas,
   gridLocked,
+  slugLocked = false,
 }: {
   initial: DropFormValues;
   pizzas: PizzaOption[];
   /** Ab Verkaufsstart: Backzeitraum und Slotlänge nur noch lesbar */
   gridLocked: boolean;
+  /** Nach dem Veröffentlichen: Die öffentliche Adresse bleibt fix */
+  slugLocked?: boolean;
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(
     saveDrop.bind(null, initial.id),
@@ -111,12 +114,13 @@ export function DropForm({
             label="Kurzname in der Adresse"
             htmlFor="slug"
             error={errors.slug}
-            hint={`/drop/${slug || "titel"}`}
+            hint={`/drop/${slug || "titel"}${slugLocked ? " · nach dem Veröffentlichen fix" : ""}`}
           >
             <Input
               id="slug"
               name="slug"
               value={slug}
+              readOnly={slugLocked}
               onChange={(e) => {
                 setSlugTouched(true);
                 setSlug(e.target.value);
