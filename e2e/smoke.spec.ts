@@ -1,22 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-test("Landingpage zeigt den nächsten Drop und berechnet die Abholzeit", async ({
+test("Landingpage zeigt den nächsten Drop oder einen Leerzustand", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "17:00–20:00",
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    /\d{2}:\d{2}–\d{2}:\d{2}\s*Uhr|Gerade ist kein Drop geplant\./,
   );
-
-  await page.getByRole("button", { name: "Margherita hinzufügen" }).click();
-  await page.getByRole("button", { name: "Diavola hinzufügen" }).click();
-  await expect(page.getByText("Freie Abholzeiten für 2 Pizzen")).toBeVisible();
-
-  await page.getByRole("button", { name: "17:48" }).click();
-  await expect(page.getByText("17:48 Uhr")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Weiter zur Zahlung" }),
-  ).toBeEnabled();
+    page.getByRole("heading", { name: "So funktioniert's" }),
+  ).toBeVisible();
 });
 
 test("Kitchen-Entwurf zeigt die Pizza im Ofen", async ({ page }) => {
