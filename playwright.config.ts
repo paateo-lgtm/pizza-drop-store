@@ -25,10 +25,14 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
-    // Webhook-Tests signieren Events selbst; ohne echtes Secret gilt ein Test-Secret.
+    // Der Testserver spricht weder mit Stripe noch mit Resend, auch wenn .env echte
+    // Schlüssel enthält: Webhook-Tests signieren Events selbst mit einem Test-Secret,
+    // und Testadressen würde Resend ohnehin ablehnen.
     env: {
+      STRIPE_SECRET_KEY: "",
       STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
       APP_URL: `http://localhost:${PORT}`,
+      RESEND_API_KEY: "",
     },
   },
 });
