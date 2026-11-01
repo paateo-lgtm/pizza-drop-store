@@ -17,6 +17,7 @@ import {
 import { featuredDrop, getUpcomingDrops } from "@/lib/booking/shop";
 import { formatLongDate, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { AlarmSignup } from "./alarm/signup-form";
 
 export default function Home() {
   return (
@@ -54,6 +55,23 @@ export default function Home() {
             </li>
           ))}
         </ol>
+      </section>
+
+      <section
+        id="drop-alarm"
+        aria-labelledby="drop-alarm-titel"
+        className="border-t border-line bg-surface"
+      >
+        <div className="mx-auto w-full max-w-6xl scroll-mt-4 px-4 py-16 sm:px-8">
+          <h2 id="drop-alarm-titel" className="text-4xl">
+            Keinen Drop verpassen
+          </h2>
+          <p className="mt-3 max-w-xl text-lg text-ink-muted">
+            Die Slots sind oft schnell weg. Mit dem Drop-Alarm weißt du als
+            Erste:r, wenn der Verkauf startet.
+          </p>
+          <AlarmSignup />
+        </div>
       </section>
     </>
   );

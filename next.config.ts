@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
         source: "/bestellung/:path*",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
+      {
+        // Ebenso der Schlüssel in Bestätigungs- und Abmeldelinks des Drop-Alarms (?t=)
+        source: "/alarm/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
     ];
   },
   partialPrefetching: true,

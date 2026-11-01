@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { defineConfig, devices } from "@playwright/test";
+import { CRON_TEST_SECRET } from "./e2e/support/cron";
 import { WEBHOOK_SECRET } from "./e2e/support/webhook";
 
 const PORT = 3100;
@@ -33,6 +34,7 @@ export default defineConfig({
       STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
       APP_URL: `http://localhost:${PORT}`,
       RESEND_API_KEY: "",
+      CRON_SECRET: CRON_TEST_SECRET,
     },
   },
 });

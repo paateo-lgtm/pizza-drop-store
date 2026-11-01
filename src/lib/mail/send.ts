@@ -27,6 +27,8 @@ export async function sendMail(mail: {
   dedupeKey: string;
   subject: string;
   react: ReactElement;
+  /** Zusätzliche Kopfzeilen, z. B. List-Unsubscribe für den Drop-Alarm */
+  headers?: Record<string, string>;
 }): Promise<MailResult> {
   if (!(await claim(mail))) return "duplicate";
 
@@ -44,7 +46,13 @@ export async function sendMail(mail: {
   let providerId: string | null;
   try {
     const { data, error } = await client.emails.send(
-      { from: FROM(), to: mail.to, subject: mail.subject, react: mail.react },
+      {
+        from: FROM(),
+        to: mail.to,
+        subject: mail.subject,
+        react: mail.react,
+        headers: mail.headers,
+      },
       { idempotencyKey: mail.dedupeKey },
     );
     if (error) throw new Error(`${error.name}: ${error.message}`);
