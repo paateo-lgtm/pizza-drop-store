@@ -259,10 +259,9 @@ export async function loadKitchenBoard(dropId: string) {
         },
       },
       orders: {
-        // Bezahlte Bestellungen: für Abholbereit, Abgeholt und die Ausgabe-Suche
-        where: {
-          status: { in: ["PAID", "IN_PROGRESS", "READY", "PICKED_UP"] },
-        },
+        // Alles, was je bezahlt war: auch Stornierte, damit die Ausgabe-Suche sie als
+        // „nicht ausgeben“ zeigt statt als unbekannt.
+        where: { status: { notIn: ["PENDING_PAYMENT", "EXPIRED"] } },
         orderBy: { pickupAt: "asc" },
         include: { items: { select: { nameSnapshot: true, quantity: true } } },
       },
