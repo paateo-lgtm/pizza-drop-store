@@ -61,14 +61,11 @@ async function DropContent({
       </Note>
     ),
     soldOut: (
-      <>
-        <Note title="Ausverkauft">
-          Alle Slots sind vergeben. Werden durch eine Stornierung oder eine
-          abgelaufene Reservierung Slots frei, erscheinen sie hier wieder – und
-          wer auf der Warteliste steht, bekommt eine Mail.
-        </Note>
-        <WaitlistForm dropId={drop.id} maxPerOrder={drop.maxPizzasPerOrder} />
-      </>
+      <Note title="Ausverkauft">
+        Alle Slots sind vergeben. Werden durch eine Stornierung oder eine
+        abgelaufene Reservierung Slots frei, erscheinen sie hier wieder – und
+        wer auf der Warteliste steht, bekommt eine Mail.
+      </Note>
     ),
     closed: (
       <Note title="Der Verkauf ist beendet">
@@ -142,6 +139,10 @@ async function DropContent({
         vatRatePercent={settings.vatRatePercent}
         closedNote={notes[state]}
       />
+      {/* Außerhalb des Bestellformulars: Formulare dürfen nicht verschachtelt sein */}
+      {state === "soldOut" && (
+        <WaitlistForm dropId={drop.id} maxPerOrder={drop.maxPizzasPerOrder} />
+      )}
     </>
   );
 }

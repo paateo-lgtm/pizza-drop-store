@@ -32,6 +32,11 @@ const nextConfig: NextConfig = {
         source: "/alarm/:path*",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
+      {
+        // Und im Austragen-Link der Warteliste (?t=)
+        source: "/warteliste/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
     ];
   },
   partialPrefetching: true,
