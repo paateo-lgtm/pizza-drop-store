@@ -18,6 +18,8 @@ export type NoticeMailProps = {
   linkLabel: string;
   /** Pflicht in Werbe-Mails (Drop-Alarm): Abmelden mit einem Klick */
   unsubscribeUrl?: string;
+  /** Text des Abmeldelinks, Vorgabe: Drop-Alarm */
+  unsubscribeLabel?: string;
   footer: string;
 };
 
@@ -86,7 +88,7 @@ export function NoticeMail(props: NoticeMailProps) {
               <>
                 {" "}
                 <Link href={props.unsubscribeUrl} style={{ color: muted }}>
-                  Vom Drop-Alarm abmelden
+                  {props.unsubscribeLabel ?? "Vom Drop-Alarm abmelden"}
                 </Link>
               </>
             )}

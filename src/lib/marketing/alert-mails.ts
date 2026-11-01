@@ -1,6 +1,7 @@
 import "server-only";
 import { createElement } from "react";
 import { NoticeMail } from "@/emails/notice-mail";
+import { pizzaCount } from "@/lib/booking/display";
 import { formatLongDate, formatTime } from "@/lib/format";
 import { sendMail } from "@/lib/mail/send";
 import { appUrl } from "@/lib/payment/order-mails";
@@ -9,6 +10,7 @@ import {
   type AlertMail,
   type ConfirmMail,
 } from "./drop-alert";
+import type { WaitlistNotice } from "./waitlist";
 
 /** Kein Zeilenumbruch aus Admin-Texten in Kopfzeilen wie dem Betreff */
 const oneLine = (text: string) => text.replace(/[\r\n]+/g, " ").trim();
@@ -34,6 +36,29 @@ export function sendConfirmMail(mail: ConfirmMail) {
       linkLabel: "Drop-Alarm bestätigen",
       footer:
         "Du bekommst diese Mail, weil diese Adresse auf pizza-drop für den Drop-Alarm eingetragen wurde.",
+    }),
+  });
+}
+
+export function sendWaitlistMail(mail: WaitlistNotice) {
+  return sendMail({
+    kind: "warteliste",
+    to: mail.to,
+    dedupeKey: mail.dedupeKey,
+    subject: `Slots frei beim Drop „${oneLine(mail.dropTitle)}“`,
+    react: createElement(NoticeMail, {
+      preview: `Jetzt sind wieder Slots für ${pizzaCount(mail.quantity)} frei.`,
+      heading: "Es sind wieder Slots frei",
+      paragraphs: [
+        `Beim Drop „${mail.dropTitle}“ ist wieder Platz für ${pizzaCount(mail.quantity)} am Stück – gebacken wird am ${formatLongDate(mail.bakeStartsAt)}.`,
+        "Wir reservieren nichts vor: Wer zuerst bucht, bekommt die Slots. Wir schreiben dir zu diesem Drop nur dieses eine Mal.",
+      ],
+      link: `${appUrl()}/drop/${mail.dropSlug}`,
+      linkLabel: "Jetzt Abholzeit sichern",
+      unsubscribeUrl: link("/warteliste/austragen", mail.leaveToken),
+      unsubscribeLabel: "Von der Warteliste austragen",
+      footer:
+        "Du bekommst diese Mail, weil du dich für diesen Drop auf die Warteliste gesetzt hast.",
     }),
   });
 }

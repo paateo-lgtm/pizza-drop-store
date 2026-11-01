@@ -2,13 +2,15 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
-/** Gemeinsamer Rahmen für Bestätigen und Abmelden: Text und genau ein Knopf. */
+/** Gemeinsamer Rahmen für Bestätigen und Abmelden (auch Warteliste): Text und genau ein Knopf. */
 export function AlarmPage({
   title,
   text,
   action,
   buttonLabel,
+  eyebrow = "Drop-Alarm",
 }: {
+  eyebrow?: string;
   title: string;
   text: ReactNode;
   /** Ohne Aktion nur die Meldung und der Weg zur Startseite */
@@ -18,7 +20,7 @@ export function AlarmPage({
   return (
     <div className="mx-auto w-full max-w-xl px-4 pt-10 pb-20 sm:px-8">
       <p className="text-sm font-medium tracking-wide text-terracotta uppercase">
-        Drop-Alarm
+        {eyebrow}
       </p>
       <h1 className="mt-4 text-4xl leading-tight sm:text-5xl">{title}</h1>
       <div className="mt-4 text-lg text-ink-muted">{text}</div>

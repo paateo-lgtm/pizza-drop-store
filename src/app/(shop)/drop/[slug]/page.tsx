@@ -10,6 +10,7 @@ import { getShopDrop } from "@/lib/booking/shop";
 import { formatLongDate, formatTime } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { OrderForm } from "./order-form";
+import { WaitlistForm } from "./waitlist-form";
 
 export const metadata: Metadata = { title: "Drop" };
 
@@ -60,10 +61,14 @@ async function DropContent({
       </Note>
     ),
     soldOut: (
-      <Note title="Ausverkauft">
-        Alle Slots sind vergeben. Werden durch eine Stornierung oder eine
-        abgelaufene Reservierung Slots frei, erscheinen sie hier wieder.
-      </Note>
+      <>
+        <Note title="Ausverkauft">
+          Alle Slots sind vergeben. Werden durch eine Stornierung oder eine
+          abgelaufene Reservierung Slots frei, erscheinen sie hier wieder – und
+          wer auf der Warteliste steht, bekommt eine Mail.
+        </Note>
+        <WaitlistForm dropId={drop.id} maxPerOrder={drop.maxPizzasPerOrder} />
+      </>
     ),
     closed: (
       <Note title="Der Verkauf ist beendet">
