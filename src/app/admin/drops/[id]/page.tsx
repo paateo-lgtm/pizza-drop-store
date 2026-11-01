@@ -110,8 +110,20 @@ async function DropDetail({
           />
         }
       />
-      <div className="-mt-4 mb-8">
+      <div className="-mt-4 mb-8 flex flex-wrap items-center gap-4">
         <StatusBadge status={status} />
+        <Link
+          href={`/kitchen/${drop.id}/vorbereitung`}
+          className="text-sm text-olive underline-offset-4 hover:underline"
+        >
+          Vorbereitungsliste
+        </Link>
+        <Link
+          href={`/kitchen/${drop.id}`}
+          className="text-sm text-olive underline-offset-4 hover:underline"
+        >
+          Küchen-Board
+        </Link>
       </div>
 
       <dl className="mb-10 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-[var(--line)] md:grid-cols-4">

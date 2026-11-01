@@ -42,6 +42,23 @@
   --wash: #2c2923;
 }
 
+/* Druck (Vorbereitungsliste): Küche auf Papier hell, spart Toner und bleibt lesbar */
+@media print {
+  .kitchen {
+    --paper: #ffffff;
+    --surface: #ffffff;
+    --ink: #000000;
+    --ink-muted: #444444;
+    --line: #bbbbbb;
+    --olive: #3f4927;
+    --olive-deep: #3f4927;
+    --olive-soft: #ffffff;
+    --terracotta: #7a3423;
+    --terracotta-soft: #ffffff;
+    --wash: #ffffff;
+  }
+}
+
 /*
  * shadcn/ui-Rollen auf die Palette abgebildet. Steht auch auf .dark/.kitchen,
  * damit var() dort gegen die dunklen Werte aufgelöst wird.

@@ -83,6 +83,13 @@ async function DropList() {
                 </span>
                 <ChevronRight className="size-6" aria-hidden />
               </Link>
+              <Link
+                href={`/kitchen/${drop.id}/vorbereitung`}
+                className="mt-1 inline-block rounded-md px-5 py-2 text-ink-muted underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Vorbereitungsliste
+                <span className="sr-only"> für {drop.title}</span>
+              </Link>
             </li>
           ))}
         </ul>

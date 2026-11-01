@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   Check,
+  ClipboardList,
   Flame,
   PackageCheck,
   PauseCircle,
@@ -139,6 +140,13 @@ export function KitchenBoardView({ board }: { board: KitchenBoard }) {
             className="rounded-md p-3 text-ink-muted hover:text-foreground"
           >
             <ArrowLeft className="size-6" aria-hidden />
+          </Link>
+          <Link
+            href={`/kitchen/${drop.id}/vorbereitung`}
+            className="rounded-md p-3 text-ink-muted hover:text-foreground"
+          >
+            <ClipboardList className="size-6" aria-hidden />
+            <span className="sr-only">Vorbereitungsliste</span>
           </Link>
           <div>
             <h1 className="font-sans text-xs tracking-wide text-ink-muted uppercase">
