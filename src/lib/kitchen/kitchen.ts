@@ -4,7 +4,8 @@
  * docs/PLAN.md, 3.2 und 3.3) – so bleiben mehrere Küchengeräte synchron.
  */
 import "server-only";
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
+import type { TicketStatus as DbTicketStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { effectiveStatus, slotStatus } from "@/lib/domain/drops";
 import {
@@ -20,6 +21,7 @@ import {
   slotLengthHint,
   type KitchenTicket,
   type TicketStatus,
+  type TimelineEntry,
 } from "@/lib/domain/kitchen";
 
 export type KitchenResult = { ok: true } | { ok: false; message: string };
@@ -30,8 +32,16 @@ class Rejection extends Error {}
 
 const TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
 
+/** Kurzzeitig belegt (Sperre, Verbindung, Timeout): nochmal versuchen hilft. */
 const BUSY =
-  "Das hat nicht geklappt – bitte gleich noch einmal tippen. Die Anzeige aktualisiert sich.";
+  "Gerade viel los – bitte gleich noch einmal tippen. Die Anzeige aktualisiert sich.";
+const BUSY_CODES = new Set(["P2024", "P2028", "P2034"]);
+/** Alles andere ist ein echter Fehler, den Wiederholen nicht behebt. */
+const BROKEN =
+  "Technischer Fehler – bitte die Küchenleitung bzw. den Admin informieren.";
+
+const TICKET_GONE =
+  "Diese Pizza gibt es nicht mehr – die Bestellung wurde storniert.";
 
 async function lockDrop(tx: Tx, dropId: string) {
   await tx.$queryRaw`SELECT id FROM "Drop" WHERE id = ${dropId} FOR UPDATE`;
@@ -40,13 +50,14 @@ async function lockDrop(tx: Tx, dropId: string) {
 /** Führt eine Küchenaktion unter der Drop-Sperre aus und übersetzt Fehler in Meldungen. */
 async function underDropLock(
   label: string,
+  target: { id: string; missing: string },
   findDropId: (tx: Tx) => Promise<string | null>,
   work: (tx: Tx, dropId: string) => Promise<void>,
 ): Promise<KitchenResult> {
   try {
     await db.$transaction(async (tx) => {
       const dropId = await findDropId(tx);
-      if (!dropId) throw new Rejection("Das gibt es nicht mehr.");
+      if (!dropId) throw new Rejection(target.missing);
       await lockDrop(tx, dropId);
       await work(tx, dropId);
     }, TX_OPTIONS);
@@ -54,8 +65,11 @@ async function underDropLock(
   } catch (error) {
     if (error instanceof Rejection)
       return { ok: false, message: error.message };
-    console.error(`Küche: ${label} fehlgeschlagen`, error);
-    return { ok: false, message: BUSY };
+    const busy =
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      BUSY_CODES.has(error.code);
+    console.error(`Küche: ${label} für ${target.id} fehlgeschlagen`, error);
+    return { ok: false, message: busy ? BUSY : BROKEN };
   }
 }
 
@@ -67,11 +81,17 @@ const ticketDropId = async (tx: Tx, ticketId: string) =>
     })
   )?.slot.dropId ?? null;
 
-async function dropTickets(tx: Tx, dropId: string) {
-  return tx.kitchenTicket.findMany({
-    where: { slot: { dropId } },
-    select: { id: true, seq: true, status: true, orderId: true },
-  });
+/** Tickets des Drops, erst unter der Sperre gelesen: ein Storno kann dazwischen liegen. */
+async function dropTickets(tx: Tx, dropId: string, ticketId: string) {
+  const tickets = (
+    await tx.kitchenTicket.findMany({
+      where: { slot: { dropId } },
+      select: { id: true, seq: true, status: true, orderId: true },
+    })
+  ).map((t) => ({ ...t, status: toTicketStatus(t.status) }));
+  const ticket = tickets.find((t) => t.id === ticketId);
+  if (!ticket) throw new Rejection(TICKET_GONE);
+  return { tickets, ticket };
 }
 
 /** Status der Bestellung aus ihren Tickets nachziehen (bezahlt → in Arbeit → abholbereit). */
@@ -81,26 +101,29 @@ async function syncOrderStatus(tx: Tx, orderId: string) {
     select: { status: true },
   });
   const status = orderStatusFromTickets(
-    tickets.map((t) => t.status as TicketStatus),
+    tickets.map((t) => toTicketStatus(t.status)),
   );
-  await tx.order.updateMany({
+  const { count } = await tx.order.updateMany({
     where: { id: orderId, status: { in: ["PAID", "IN_PROGRESS", "READY"] } },
     data: { status },
   });
+  // Sonst bliebe die Bestellung still stehen, während das Ticket weiterläuft.
+  if (count === 0) throw new Rejection(TICKET_GONE);
 }
 
 export function startTicket(ticketId: string): Promise<KitchenResult> {
   return underDropLock(
     "Ofenstart",
+    { id: ticketId, missing: TICKET_GONE },
     (tx) => ticketDropId(tx, ticketId),
     async (tx, dropId) => {
-      const tickets = await dropTickets(tx, dropId);
-      if (!canStartTicket(ticketId, narrow(tickets))) {
+      const { tickets, ticket } = await dropTickets(tx, dropId, ticketId);
+      if (!canStartTicket(ticketId, tickets)) {
         throw new Rejection(
           "Diese Pizza ist nicht dran – erst die Pizza im Ofen fertig melden.",
         );
       }
-      const ticket = await tx.kitchenTicket.update({
+      await tx.kitchenTicket.update({
         where: { id: ticketId },
         data: { status: "OVEN", ovenStartedAt: new Date() },
       });
@@ -112,13 +135,14 @@ export function startTicket(ticketId: string): Promise<KitchenResult> {
 export function finishTicket(ticketId: string): Promise<KitchenResult> {
   return underDropLock(
     "Fertig",
+    { id: ticketId, missing: TICKET_GONE },
     (tx) => ticketDropId(tx, ticketId),
     async (tx, dropId) => {
-      const tickets = await dropTickets(tx, dropId);
-      if (!canFinishTicket(ticketId, narrow(tickets))) {
+      const { tickets, ticket } = await dropTickets(tx, dropId, ticketId);
+      if (!canFinishTicket(ticketId, tickets)) {
         throw new Rejection("Diese Pizza ist nicht im Ofen.");
       }
-      const ticket = await tx.kitchenTicket.update({
+      await tx.kitchenTicket.update({
         where: { id: ticketId },
         data: { status: "DONE", doneAt: new Date() },
       });
@@ -127,9 +151,17 @@ export function finishTicket(ticketId: string): Promise<KitchenResult> {
   );
 }
 
+const PICKUP_REFUSAL: Partial<Record<string, string>> = {
+  PICKED_UP: "Diese Bestellung ist schon abgeholt.",
+  CANCELLED: "Diese Bestellung wurde storniert – nicht ausgeben.",
+  REFUNDED: "Diese Bestellung wurde storniert und erstattet – nicht ausgeben.",
+  NO_SHOW: "Diese Bestellung ist als nicht abgeholt markiert.",
+};
+
 export function pickUpOrder(orderId: string): Promise<KitchenResult> {
   return underDropLock(
     "Ausgabe",
+    { id: orderId, missing: "Diese Bestellung gibt es nicht." },
     async (tx) =>
       (
         await tx.order.findUnique({
@@ -138,15 +170,15 @@ export function pickUpOrder(orderId: string): Promise<KitchenResult> {
         })
       )?.dropId ?? null,
     async (tx) => {
-      const order = await tx.order.findUniqueOrThrow({
+      const order = await tx.order.findUnique({
         where: { id: orderId },
         select: { status: true },
       });
+      if (!order) throw new Rejection("Diese Bestellung gibt es nicht.");
       if (!canPickUp(order.status)) {
         throw new Rejection(
-          order.status === "PICKED_UP"
-            ? "Diese Bestellung ist schon abgeholt."
-            : "Diese Bestellung ist noch nicht fertig.",
+          PICKUP_REFUSAL[order.status] ??
+            "Diese Bestellung ist noch nicht fertig.",
         );
       }
       await tx.order.update({
@@ -161,6 +193,7 @@ export function pickUpOrder(orderId: string): Promise<KitchenResult> {
 export function blockNextSlot(dropId: string): Promise<KitchenResult> {
   return underDropLock(
     "Puffer",
+    { id: dropId, missing: "Diesen Drop gibt es nicht mehr." },
     async (tx) =>
       (
         await tx.drop.findUnique({
@@ -195,15 +228,14 @@ export function blockNextSlot(dropId: string): Promise<KitchenResult> {
   );
 }
 
-/** Tickets im Schema kennen noch PREP; die Küche behandelt es wie „wartet“. */
-function narrow<T extends { status: string }>(
-  tickets: T[],
-): (T & { status: TicketStatus })[] {
-  return tickets.map((t) => ({
-    ...t,
-    status: t.status === "PREP" ? "QUEUED" : (t.status as TicketStatus),
-  }));
-}
+/** Das Schema kennt noch PREP; die Küche behandelt es wie „wartet“. */
+const TICKET_STATUS: Record<DbTicketStatus, TicketStatus> = {
+  QUEUED: "QUEUED",
+  PREP: "QUEUED",
+  OVEN: "OVEN",
+  DONE: "DONE",
+};
+const toTicketStatus = (status: DbTicketStatus) => TICKET_STATUS[status];
 
 function pizzaSummary(items: { nameSnapshot: string; quantity: number }[]) {
   return items.map((i) => `${i.quantity} × ${i.nameSnapshot}`).join(", ");
@@ -239,34 +271,37 @@ export async function loadKitchenBoard(dropId: string) {
   const raw = drop.slots.flatMap((slot) =>
     slot.ticket ? [{ slot, ticket: slot.ticket }] : [],
   );
-  // Position innerhalb der Bestellung: „Pizza 1 von 2“
+  // Position innerhalb der Bestellung: „Pizza 1 von 2“ (Slots kommen in seq-Reihenfolge)
   const perOrder = new Map<string, number[]>();
   for (const { ticket } of raw) {
-    perOrder.set(ticket.orderId, [
-      ...(perOrder.get(ticket.orderId) ?? []),
-      ticket.seq,
-    ]);
+    const seqs = perOrder.get(ticket.orderId) ?? [];
+    seqs.push(ticket.seq);
+    perOrder.set(ticket.orderId, seqs);
   }
-  const tickets = narrow(
-    raw.map(({ slot, ticket }) => {
-      const seqs = (perOrder.get(ticket.orderId) ?? []).sort((a, b) => a - b);
-      return {
-        id: ticket.id,
-        seq: ticket.seq,
-        status: ticket.status,
-        slotStartsAt: slot.startsAt,
-        slotEndsAt: slot.endsAt,
-        ovenStartedAt: ticket.ovenStartedAt,
-        doneAt: ticket.doneAt,
-        orderId: ticket.orderId,
-        orderNumber: ticket.order.number,
-        customer: ticket.order.customerName,
-        pizza: ticket.pizza.name,
-        position: seqs.indexOf(ticket.seq) + 1,
-        of: seqs.length,
-      };
-    }),
-  ) satisfies KitchenTicket[];
+  const tickets = raw.map(({ slot, ticket }) => {
+    const seqs = perOrder.get(ticket.orderId) ?? [];
+    return {
+      id: ticket.id,
+      seq: ticket.seq,
+      status: toTicketStatus(ticket.status),
+      slotStartsAt: slot.startsAt,
+      slotEndsAt: slot.endsAt,
+      ovenStartedAt: ticket.ovenStartedAt,
+      doneAt: ticket.doneAt,
+      orderId: ticket.orderId,
+      orderNumber: ticket.order.number,
+      customer: ticket.order.customerName,
+      pizza: ticket.pizza.name,
+      position: seqs.indexOf(ticket.seq) + 1,
+      of: seqs.length,
+    };
+  }) satisfies KitchenTicket[];
+
+  type BoardEntry =
+    | Extract<TimelineEntry, { kind: "gap" }>
+    | (Extract<TimelineEntry, { kind: "ticket" }> & {
+        ticket: (typeof tickets)[number];
+      });
 
   const queue = kitchenQueue(tickets);
   const average = averageBakeSeconds(tickets);
@@ -302,11 +337,11 @@ export async function loadKitchenBoard(dropId: string) {
         ticketId: s.ticket?.id ?? null,
       })),
       afterSeq,
-    ).map((entry) =>
-      entry.kind === "ticket"
-        ? { ...entry, ticket: ticketById.get(entry.ticketId)! }
-        : entry,
-    ),
+    ).flatMap((entry): BoardEntry[] => {
+      if (entry.kind === "gap") return [entry];
+      const ticket = ticketById.get(entry.ticketId);
+      return ticket ? [{ ...entry, ticket }] : [];
+    }),
     doneCount: queue.done.length,
     totalCount: tickets.length,
     delaySeconds: delaySeconds(tickets, drop.slotSeconds, now),
