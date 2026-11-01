@@ -11,6 +11,9 @@ import { getSettings } from "@/lib/settings";
 /** Grundlage der Hochrechnung, damit die Küche sie einordnen kann. */
 export type PrepBasis = "history" | "current" | "equal";
 
+/** So viele zuletzt gebackene Drops fließen in die Hochrechnung ein. */
+const HISTORY_DROPS = 10;
+
 export async function loadPrepList(dropId: string) {
   const now = new Date();
   const [drop, settings] = await Promise.all([
@@ -38,6 +41,13 @@ export async function loadPrepList(dropId: string) {
   if (!drop) return null;
 
   const pizzaIds = drop.pizzas.map((p) => p.pizzaId);
+  // Nur die jüngsten gebackenen Drops: alte Speisekarten sollen die Verteilung nicht prägen.
+  const recent = await db.drop.findMany({
+    where: { id: { not: dropId }, bakeEndsAt: { lt: now } },
+    orderBy: { bakeEndsAt: "desc" },
+    take: HISTORY_DROPS,
+    select: { id: true },
+  });
   const [sold, past] = await Promise.all([
     db.orderItem.groupBy({
       by: ["pizzaId"],
@@ -47,15 +57,13 @@ export async function loadPrepList(dropId: string) {
       },
       _sum: { quantity: true },
     }),
-    // Frühere Drops: schon gebacken, nicht dieser
     db.orderItem.groupBy({
       by: ["pizzaId"],
       where: {
         pizzaId: { in: pizzaIds },
         order: {
-          dropId: { not: dropId },
+          dropId: { in: recent.map((d) => d.id) },
           status: { in: SOLD_ORDER_STATUSES },
-          drop: { bakeEndsAt: { lt: now } },
         },
       },
       _sum: { quantity: true },

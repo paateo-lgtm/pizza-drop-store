@@ -144,7 +144,9 @@ export function PrepTable({
               </thead>
               <tbody>
                 {section.rows.map((row) => {
-                  const done = checked.includes(row.key);
+                  // Menge im Schlüssel: Ändert sich die Menge, ist die Position wieder offen.
+                  const checkKey = `${row.key}@${row.withBuffer}`;
+                  const done = checked.includes(checkKey);
                   const unit = UNIT_LABELS[row.unit];
                   return (
                     <tr
@@ -160,7 +162,7 @@ export function PrepTable({
                           <input
                             type="checkbox"
                             checked={done}
-                            onChange={() => toggle(row.key)}
+                            onChange={() => toggle(checkKey)}
                             className="size-6 shrink-0 accent-[var(--olive)]"
                           />
                           {row.label}
