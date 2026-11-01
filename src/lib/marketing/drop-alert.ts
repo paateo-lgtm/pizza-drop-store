@@ -29,6 +29,15 @@ export type AlertMail = {
   unsubscribeToken: string;
 };
 
+/**
+ * Version des Einwilligungstexts im Anmeldeformular (Nachweis nach DSGVO Art. 7).
+ * Bei jeder inhaltlichen Änderung des Texts hochzählen.
+ */
+export const CONSENT_VERSION = "einwilligung-2026-11-01";
+
+/** Kennung der Bestätigungsmails im Mail-Protokoll (für das Stundenbudget). */
+export const CONFIRM_MAIL_KIND = "drop-alarm-bestaetigen";
+
 /** 32 Byte Zufall: nicht zu erraten, auch nicht über viele Versuche. */
 const newToken = () => randomBytes(32).toString("base64url");
 
@@ -36,17 +45,23 @@ export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 /**
  * Anmeldung zum Drop-Alarm. Gibt bewusst nichts zurück: Die Antwort an die Person
- * ist immer dieselbe, egal ob die Adresse schon bekannt ist.
+ * ist immer dieselbe, egal ob die Adresse schon bekannt ist. `allowConfirm` begrenzt
+ * die Bestätigungsmails insgesamt (Schutz fremder Postfächer); die Anmeldung bleibt
+ * dann offen, ein späterer Versuch schickt den Link.
  */
 export async function subscribe(
   rawEmail: string,
-  deps: { sendConfirm: (mail: ConfirmMail) => Promise<unknown> },
+  deps: {
+    sendConfirm: (mail: ConfirmMail) => Promise<unknown>;
+    allowConfirm?: () => Promise<boolean>;
+  },
   source = "landingpage",
 ): Promise<void> {
   const email = normalizeEmail(rawEmail);
   const existing = await db.subscriber.findUnique({ where: { email } });
   const action = subscribeAction(existing?.status ?? null);
   if (action === "none") return;
+  const origin = `${source}|${CONSENT_VERSION}`;
 
   let subscriber;
   if (action === "create") {
@@ -54,7 +69,7 @@ export async function subscribe(
     subscriber = await db.subscriber.upsert({
       where: { email },
       update: {},
-      create: { email, token: newToken(), source },
+      create: { email, token: newToken(), source: origin },
     });
   } else if (action === "restart") {
     subscriber = await db.subscriber.update({
@@ -64,18 +79,32 @@ export async function subscribe(
         token: newToken(),
         confirmedAt: null,
         unsubscribedAt: null,
-        source,
+        source: origin,
       },
     });
   } else {
     subscriber = existing!;
   }
   if (subscriber.status !== "PENDING") return;
+  if (deps.allowConfirm && !(await deps.allowConfirm())) {
+    console.warn("Drop-Alarm: Stundenbudget für Bestätigungsmails erschöpft");
+    return;
+  }
 
   await deps.sendConfirm({
     to: subscriber.email,
     token: subscriber.token,
     dedupeKey: confirmMailKey(subscriber.id, new Date()),
+  });
+}
+
+/** Bestätigungsmails der letzten Stunde, über alle Adressen. */
+export function confirmMailsLastHour(now: Date): Promise<number> {
+  return db.emailLog.count({
+    where: {
+      kind: CONFIRM_MAIL_KIND,
+      createdAt: { gte: new Date(now.getTime() - 3_600_000) },
+    },
   });
 }
 
@@ -110,18 +139,28 @@ export async function unsubscribe(
   return "unsubscribed";
 }
 
+export type AlertRun = {
+  sent: number;
+  /** Ohne RESEND_API_KEY nicht versendet: ein Einrichtungsfehler, kein Erfolg */
+  skipped: number;
+  failed: number;
+  /** Noch offen für spätere Läufe (Limit, Zeitbudget, Fehler) */
+  remaining: number;
+};
+
 /**
  * Verschickt den Alarm für alle Drops im Verkauf an bestätigte Abonnenten, die ihn
- * noch nicht haben – höchstens `limit` Mails pro Lauf (Resend-Limits, Laufzeit).
- * Gescheiterte Mails versucht der nächste Lauf erneut.
+ * noch nicht haben. Jeder Versuch zählt zum `limit` (Resend-Limits); nach `deadline`
+ * (ms seit Epoche) bricht der Lauf ab. Gescheiterte Mails versucht der nächste Lauf.
  */
 export async function sendDueDropAlerts(
   now: Date,
   deps: {
     sendAlert: (mail: AlertMail) => Promise<MailResult>;
     limit: number;
+    deadline?: number;
   },
-): Promise<{ sent: number; remaining: number }> {
+): Promise<AlertRun> {
   const candidates = await db.drop.findMany({
     where: {
       status: { in: ["SCHEDULED", "ON_SALE"] },
@@ -131,8 +170,8 @@ export async function sendDueDropAlerts(
   });
   const due = candidates.filter((drop) => isAlertDue(drop, now));
 
-  let sent = 0;
-  let remaining = 0;
+  const run: AlertRun = { sent: 0, skipped: 0, failed: 0, remaining: 0 };
+  let attempts = 0;
   for (const drop of due) {
     const prefix = alertMailKey(drop.id, "");
     // Erledigt oder gerade in Arbeit; gescheiterte bzw. übersprungene zählen nicht.
@@ -155,10 +194,20 @@ export async function sendDueDropAlerts(
     const open = subscribers.filter((s) => !doneIds.has(s.id));
 
     for (const subscriber of open) {
-      if (sent >= deps.limit) {
-        remaining += 1;
+      const outOfTime =
+        deps.deadline !== undefined && Date.now() > deps.deadline;
+      if (attempts >= deps.limit || outOfTime) {
+        run.remaining += 1;
         continue;
       }
+      // Wer sich während des Laufs abmeldet, bekommt nichts mehr.
+      const current = await db.subscriber.findUnique({
+        where: { id: subscriber.id },
+        select: { status: true },
+      });
+      if (current?.status !== "CONFIRMED") continue;
+
+      attempts += 1;
       try {
         const result = await deps.sendAlert({
           to: subscriber.email,
@@ -171,13 +220,18 @@ export async function sendDueDropAlerts(
           saleEndsAt: drop.saleEndsAt,
           unsubscribeToken: subscriber.token,
         });
-        if (result === "sent") sent += 1;
+        if (result === "sent") run.sent += 1;
+        if (result === "skipped") {
+          run.skipped += 1;
+          run.remaining += 1;
+        }
       } catch (error) {
         // Eine kaputte Adresse darf die übrigen nicht aufhalten; der nächste Lauf versucht es erneut.
         console.error(`Drop-Alarm an ${subscriber.id} fehlgeschlagen`, error);
-        remaining += 1;
+        run.failed += 1;
+        run.remaining += 1;
       }
     }
   }
-  return { sent, remaining };
+  return run;
 }
