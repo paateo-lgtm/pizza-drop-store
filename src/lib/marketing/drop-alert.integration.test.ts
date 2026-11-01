@@ -143,7 +143,10 @@ describe("sendDueDropAlerts", () => {
       sendAlert: a.sendAlert,
       limit: 1000,
     });
-    const mine = a.sent.filter((m) => m.to.startsWith(RUN));
+    // Nur die Adressen dieses Tests; Bestätigte aus früheren Tests bekommen ihn zu Recht auch
+    const mine = a.sent.filter(
+      (m) => m.dropId === onSale.id && m.to.includes("-alarm-"),
+    );
     expect(mine).toEqual([
       expect.objectContaining({
         to: email("alarm-ja"),
@@ -175,7 +178,9 @@ describe("sendDueDropAlerts", () => {
         limit: 1,
       });
       expect(a.sent.length).toBeLessThanOrEqual(1);
-      total += a.sent.filter((m) => m.dropId === drop.id).length;
+      total += a.sent.filter(
+        (m) => m.dropId === drop.id && m.to.includes("-limit-"),
+      ).length;
       if (result.remaining === 0) break;
     }
     expect(total).toBe(2);
