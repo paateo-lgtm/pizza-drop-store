@@ -248,4 +248,31 @@ describe("sendDueWaitlistNotices", () => {
     expect(n.sent.length).toBe(1);
     expect(run.remaining).toBeGreaterThanOrEqual(1);
   });
+
+  it("löscht Einträge, sobald der Drop vorbei oder abgesagt ist", async () => {
+    const past = await f.drop("gebacken", 4, [pizza.id]);
+    const cancelled = await f.drop("storniert", 4, [pizza.id]);
+    const open = await f.drop("laeuft", 4, [pizza.id]);
+    for (const drop of [past, cancelled, open]) {
+      await joinWaitlist({ dropId: drop.id, email: email("weg"), quantity: 1 });
+    }
+    await db.drop.update({
+      where: { id: past.id },
+      data: { bakeEndsAt: new Date(Date.now() - 60_000) },
+    });
+    await db.drop.update({
+      where: { id: cancelled.id },
+      data: { status: "CANCELLED" },
+    });
+
+    await sendDueWaitlistNotices(new Date(), {
+      sendNotice: notices().sendNotice,
+      limit: 0,
+    });
+    const left = await db.waitlistEntry.findMany({
+      where: { email: email("weg") },
+      select: { dropId: true },
+    });
+    expect(left).toEqual([{ dropId: open.id }]);
+  });
 });
