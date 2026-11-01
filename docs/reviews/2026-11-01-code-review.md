@@ -164,6 +164,18 @@
 - **Exportierte Typen, die nur in der eigenen Datei genutzt werden** (ca. 30): normal und harmlos. Das `export` zu entfernen wäre nur Aufwand ohne Nutzen.
 - **Test-Helfer** (`test/db-fixtures.ts`, `test/server-only-stub.ts`): werden gebraucht.
 
+## Umgesetzt (2026-11-01)
+
+- **Schritt 1:** 1.1, 1.4 und aus Priorität 3 die UI-Bausteine, `findConsecutiveStarts` und die `cn`-Importe (`baa73ce`).
+- **Schritt 2:** 1.2 und 1.3, also `src/lib/tx.ts` mit `lockDrop()` und `isBusyError()` (`e085e7b` RED, `5f00698` GREEN).
+- **Schritt 3:**
+  - 1.5 Bestellseite (`db12af2`)
+  - 2.1 als einfacher Schritt: Polling 3 s bzw. 6 s (`e1a3061`)
+- **Gegenprüfung durch `code-reviewer`:** keine kritischen, schweren oder mittleren Befunde.
+- **Offen nach Plan:**
+  - 2.3 Indizes, mit der Migration für die Warteliste
+  - 2.2, 2.4 und 2.5 nach Bedarf
+
 ## Vorgeschlagene Reihenfolge
 
 1. **Ein Commit „Aufräumen“:**
