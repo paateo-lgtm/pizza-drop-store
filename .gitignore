@@ -54,3 +54,6 @@ next-env.d.ts
 
 # lokale Uploads (Produktion: Vercel Blob)
 /public/uploads/
+
+# Wissensgraph (graphify) – jederzeit neu erzeugbar mit /graphify bzw. graphify --update
+/graphify-out/
