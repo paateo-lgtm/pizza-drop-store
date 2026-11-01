@@ -15,7 +15,8 @@ test.describe("Küche als App", () => {
       name: "Pizza Drop · Küche",
       start_url: "/kitchen",
       scope: "/kitchen",
-      display: "fullscreen",
+      display: "standalone",
+      display_override: ["fullscreen", "standalone"],
     });
 
     for (const icon of manifest.icons as { src: string; sizes: string }[]) {
@@ -23,10 +24,13 @@ test.describe("Küche als App", () => {
       expect(image.status(), icon.src).toBe(200);
       expect(image.headers()["content-type"]).toBe("image/png");
     }
-    expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual([
-      "192x192",
-      "512x512",
-    ]);
+    expect(
+      manifest.icons.map(
+        (i: { sizes: string; purpose: string }) => `${i.sizes} ${i.purpose}`,
+      ),
+    ).toEqual(["192x192 any", "512x512 any", "512x512 maskable"]);
+    const apple = await request.get("/kueche-icon/180");
+    expect(apple.headers()["content-type"]).toBe("image/png");
 
     // Die Kundenseite bleibt ohne Küchen-Manifest
     await page.goto("/");

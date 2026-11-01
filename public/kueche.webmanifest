@@ -1,11 +1,13 @@
 {
+  "id": "/kitchen",
   "name": "Pizza Drop · Küche",
   "short_name": "Küche",
   "description": "Kitchen-Mode für laufende Pizza-Drops: Ofen, Ausgabe, Verzug.",
   "lang": "de",
   "start_url": "/kitchen",
   "scope": "/kitchen",
-  "display": "fullscreen",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "any",
   "background_color": "#1c1a16",
   "theme_color": "#1c1a16",
@@ -14,13 +16,19 @@
       "src": "/kueche-icon/192",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/kueche-icon/512",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/kueche-icon/512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

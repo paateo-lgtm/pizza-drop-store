@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     title: "Küche",
     statusBarStyle: "black-translucent",
   },
-  icons: { apple: "/kueche-icon/192" },
+  icons: { apple: "/kueche-icon/180" },
 };
 
 export const viewport: Viewport = { themeColor: "#1c1a16" };

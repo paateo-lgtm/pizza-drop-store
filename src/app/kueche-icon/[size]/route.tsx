@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 /** App-Icons der Küche (Manifest, Homescreen). Platzhalter bis zum echten Logo. */
-const SIZES = ["192", "512"] as const;
+const SIZES = ["180", "192", "512"] as const;
 
 export function generateStaticParams() {
   return SIZES.map((size) => ({ size }));

@@ -11,10 +11,14 @@ import type { KitchenBoard } from "@/lib/kitchen/kitchen";
 
 type Order = KitchenBoard["orders"][number];
 
+/** Warum nicht ausgeben: Falsch ausgeben ist an der Theke der teuerste Fehler. */
 const STATE: Partial<Record<OrderStatus, string>> = {
   PAID: "Wartet auf den Ofen",
   IN_PROGRESS: "Noch im Ofen",
   PICKED_UP: "Schon abgeholt",
+  CANCELLED: "Storniert – NICHT ausgeben",
+  REFUNDED: "Storniert und erstattet – NICHT ausgeben",
+  NO_SHOW: "Als nicht abgeholt markiert",
 };
 
 /** Ausgabe: Bestellung per Nummer, Name, Abholcode oder QR-Code finden und ausgeben. */
@@ -29,8 +33,11 @@ export function PickupDesk({
 }) {
   const [query, setQuery] = useState("");
   const [scanning, setScanning] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
   const hits = findPickupOrders(orders, query);
   const searched = query.trim().replace(/^#/, "").trim().length > 0;
+  // Gültiger Code ohne Treffer: anderer Drop oder vertippt – nicht „gibt es nicht“.
+  const foreignCode = hits.length === 0 && parseScannedCode(query) !== null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -42,6 +49,7 @@ export function PickupDesk({
             aria-hidden
           />
           <Input
+            ref={input}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -51,18 +59,23 @@ export function PickupDesk({
           />
         </label>
         <ScanButton
+          scanning={scanning}
+          setScanning={setScanning}
           onScan={(code) => {
             setQuery(code);
             setScanning(false);
           }}
-          scanning={scanning}
-          setScanning={setScanning}
         />
       </div>
-      {searched && (
-        <div aria-live="polite">
-          {hits.length === 0 ? (
-            <p className="text-ink-muted">Keine passende Bestellung.</p>
+      {/* Immer vorhanden, damit Screenreader neue Treffer ansagen. */}
+      <div role="status" aria-live="polite">
+        {searched &&
+          (hits.length === 0 ? (
+            <p className="text-ink-muted">
+              {foreignCode
+                ? "Dieser Abholcode gehört zu keiner Bestellung dieses Drops – anderer Drop?"
+                : "Keine passende Bestellung."}
+            </p>
           ) : (
             <ul className="flex flex-col gap-2" aria-label="Suchergebnis">
               {hits.map((order) => (
@@ -93,6 +106,8 @@ export function PickupDesk({
                         if (pending) return;
                         onPickUp(order.id);
                         setQuery("");
+                        // Der Knopf verschwindet; der Fokus geht zurück in die Suche.
+                        input.current?.focus();
                       }}
                     >
                       <PackageCheck aria-hidden /> Abgeholt
@@ -105,9 +120,8 @@ export function PickupDesk({
                 </li>
               ))}
             </ul>
-          )}
-        </div>
-      )}
+          ))}
+      </div>
     </div>
   );
 }
@@ -117,7 +131,7 @@ export function PickupDesk({
 // Code einfach eingetippt – die Suche findet ihn genauso.
 
 type Detector = {
-  detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]>;
+  detect(source: HTMLVideoElement): Promise<{ rawValue: unknown }[]>;
 };
 type DetectorClass = new (options: { formats: string[] }) => Detector;
 
@@ -126,14 +140,29 @@ const detectorClass = () =>
 
 const noop = () => () => {};
 
+/** Liest ein Bild alle 250 ms; nach ~10 s ohne lesbares Bild gilt der Scanner als defekt. */
+const SCAN_EVERY_MS = 250;
+const MAX_FAILED_FRAMES = 40;
+
+function cameraProblem(error: unknown) {
+  const name = error instanceof DOMException ? error.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return "Kamera nicht erlaubt – in den Browser-Einstellungen freigeben oder den Code eintippen.";
+  }
+  if (name === "NotFoundError" || name === "OverconstrainedError") {
+    return "Keine Kamera gefunden – bitte den Code eintippen.";
+  }
+  return "Kamera nicht verfügbar – bitte den Code eintippen.";
+}
+
 function ScanButton({
-  onScan,
   scanning,
   setScanning,
+  onScan,
 }: {
-  onScan: (code: string) => void;
   scanning: boolean;
   setScanning: (value: boolean) => void;
+  onScan: (code: string) => void;
 }) {
   // Erst im Browser bekannt; auf dem Server nie anzeigen (kein Hydration-Fehler).
   const supported = useSyncExternalStore(
@@ -148,6 +177,7 @@ function ScanButton({
         type="button"
         variant="outline"
         className="h-12"
+        aria-haspopup="dialog"
         onClick={() => setScanning(true)}
       >
         <QrCode aria-hidden /> QR scannen
@@ -166,20 +196,25 @@ function Scanner({
   onScan: (code: string) => void;
   onClose: () => void;
 }) {
+  const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [notACode, setNotACode] = useState(false);
   // Das Board rendert bei jedem Polling neu; die Kamera soll deshalb nicht neu starten.
   const handlers = useRef({ onScan, onClose });
   useEffect(() => {
     handlers.current = { onScan, onClose };
   });
 
+  // Natives Modal: Fokusfalle, Escape und inerter Hintergrund; danach Fokus zurück.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handlers.current.onClose();
+    const trigger = document.activeElement;
+    const element = dialog.current;
+    element?.showModal();
+    return () => {
+      element?.close();
+      if (trigger instanceof HTMLElement) trigger.focus();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   useEffect(() => {
@@ -188,21 +223,35 @@ function Scanner({
     const detector = new Detector({ formats: ["qr_code"] });
     let stream: MediaStream | null = null;
     let timer = 0;
+    let failed = 0;
     let active = true;
 
     async function scan() {
       if (!active || !video.current) return;
       try {
         const [hit] = await detector.detect(video.current);
-        const code = hit && parseScannedCode(hit.rawValue);
-        if (code && active) {
-          handlers.current.onScan(code);
+        failed = 0;
+        if (hit && typeof hit.rawValue === "string") {
+          const code = parseScannedCode(hit.rawValue);
+          if (code && active) {
+            handlers.current.onScan(code);
+            return;
+          }
+          // Ein anderer QR-Code (z. B. eine Website): sagen, nicht stumm weiterscannen.
+          if (active) setNotACode(true);
+        }
+      } catch (error) {
+        // Einzelne Bilder sind oft nicht lesbar (Video startet noch); dauerhaft nicht.
+        failed += 1;
+        if (failed >= MAX_FAILED_FRAMES) {
+          console.error("QR-Scanner liest keine Bilder", error);
+          if (active) {
+            setProblem("Der Scanner liest nichts – bitte den Code eintippen.");
+          }
           return;
         }
-      } catch {
-        // Einzelbild nicht lesbar (Video lädt noch): beim nächsten Bild weiter.
       }
-      timer = window.setTimeout(scan, 250);
+      timer = window.setTimeout(scan, SCAN_EVERY_MS);
     }
 
     navigator.mediaDevices
@@ -218,12 +267,8 @@ function Scanner({
         video.current.play().catch(() => undefined);
         void scan();
       })
-      .catch(() => {
-        if (active) {
-          setProblem(
-            "Kamera nicht verfügbar – bitte den Code eintippen oder die Kamera erlauben.",
-          );
-        }
+      .catch((error: unknown) => {
+        if (active) setProblem(cameraProblem(error));
       });
 
     return () => {
@@ -234,39 +279,52 @@ function Scanner({
   }, []);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialog}
       aria-label="QR-Code scannen"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/90 p-6"
+      aria-describedby="scan-hint"
+      // Escape: schließen über den Zustand, damit React den Dialog entfernt.
+      onCancel={(e) => {
+        e.preventDefault();
+        handlers.current.onClose();
+      }}
+      className="m-0 h-dvh max-h-none w-dvw max-w-none bg-black/90 p-6 text-white backdrop:bg-black/60"
     >
-      {problem ? (
-        <p role="alert" className="max-w-md text-center text-lg text-white">
-          {problem}
-        </p>
-      ) : (
-        <>
-          <video
-            ref={video}
-            muted
-            playsInline
-            className="aspect-square w-full max-w-md rounded-md object-cover"
-          />
-          <p className="text-lg text-white">
-            QR-Code des Kunden vor die Kamera
+      <div className="flex h-full flex-col items-center justify-center gap-4">
+        {problem ? (
+          <p
+            id="scan-hint"
+            role="alert"
+            className="max-w-md text-center text-lg"
+          >
+            {problem}
           </p>
-        </>
-      )}
-      <Button
-        type="button"
-        variant="outline"
-        size="lg"
-        className="h-14"
-        autoFocus
-        onClick={onClose}
-      >
-        <X aria-hidden /> Schließen
-      </Button>
-    </div>
+        ) : (
+          <>
+            <video
+              ref={video}
+              muted
+              playsInline
+              className="aspect-square w-full max-w-md rounded-md object-cover"
+            />
+            <p id="scan-hint" className="text-lg" aria-live="polite">
+              {notACode
+                ? "Das ist kein Abholcode – bitte den QR-Code auf der Bestellseite zeigen lassen."
+                : "QR-Code des Kunden vor die Kamera"}
+            </p>
+          </>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="h-14"
+          autoFocus
+          onClick={onClose}
+        >
+          <X aria-hidden /> Schließen
+        </Button>
+      </div>
+    </dialog>
   );
 }

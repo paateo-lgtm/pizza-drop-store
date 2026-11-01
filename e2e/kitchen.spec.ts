@@ -228,6 +228,14 @@ test.describe("Kitchen-Mode", () => {
       ).toBeHidden();
       await result.getByRole("button", { name: /Abgeholt/ }).click();
       await expect(desk.getByText(/^Abgeholt: #\d+$/)).toBeVisible();
+      // Fokus zurück in der Suche, bereit für den nächsten Kunden
+      await expect(desk.getByRole("searchbox")).toBeFocused();
+
+      // Gültiger Code aus einem anderen Drop: eigene Meldung statt „keine Bestellung“
+      await desk.getByRole("searchbox").fill("ZZZZZZ");
+      await expect(
+        desk.getByText(/gehört zu keiner Bestellung dieses Drops/),
+      ).toBeVisible();
 
       const [order] = await drop.orders();
       expect(order.status).toBe("PICKED_UP");
