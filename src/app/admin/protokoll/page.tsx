@@ -17,6 +17,7 @@ const ACTIONS: Record<string, string> = {
   duplicate: "dupliziert",
   block: "Slot gesperrt",
   unblock: "Slot freigegeben",
+  cancel: "Storniert",
 };
 
 const ENTITIES: Record<string, string> = {
@@ -25,6 +26,7 @@ const ENTITIES: Record<string, string> = {
   settings: "Einstellungen",
   user: "Zugang",
   drop: "Drop",
+  order: "Bestellung",
 };
 
 const dateTime = new Intl.DateTimeFormat("de-DE", {

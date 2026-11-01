@@ -3,29 +3,62 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { Suspense } from "react";
+import QRCode from "qrcode";
+import { Suspense, type ReactNode } from "react";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { Countdown } from "@/components/countdown";
 import { Button } from "@/components/ui/button";
 import { verifyOrderKey } from "@/lib/booking/order-link";
 import { db } from "@/lib/db";
 import { isOrderActive } from "@/lib/domain/booking";
+import type { OrderStatus } from "@/lib/domain/drops";
 import { formatLongDate, formatPrice, formatTime } from "@/lib/format";
+import { isStripeConfigured } from "@/lib/payment/stripe";
+import { startPayment } from "./actions";
+import { PayForm } from "./pay-form";
 
 export const metadata: Metadata = {
   title: "Deine Bestellung",
   robots: { index: false },
 };
 
-const STATUS_TITLES: Partial<Record<string, string>> = {
-  PAID: "Bezahlt – wir backen für dich.",
-  IN_PROGRESS: "Deine Pizzen sind im Ofen.",
-  READY: "Abholbereit!",
-  PICKED_UP: "Abgeholt. Guten Appetit!",
-  CANCELLED: "Diese Bestellung wurde storniert.",
-  REFUNDED: "Diese Bestellung wurde erstattet.",
-  NO_SHOW: "Diese Bestellung wurde nicht abgeholt.",
-  EXPIRED: "Die Reservierung ist abgelaufen.",
+const STATUS: Partial<Record<OrderStatus, { title: string; text: string }>> = {
+  PAID: {
+    title: "Bezahlt – wir backen für dich.",
+    text: "Komm zur Abholzeit vorbei und zeig deinen Abholcode.",
+  },
+  IN_PROGRESS: {
+    title: "Deine Pizzen sind im Ofen.",
+    text: "Gleich geschafft – zeig zur Abholzeit deinen Abholcode.",
+  },
+  READY: {
+    title: "Abholbereit!",
+    text: "Deine Pizzen warten auf dich. Zeig einfach deinen Abholcode.",
+  },
+  PICKED_UP: {
+    title: "Abgeholt. Guten Appetit!",
+    text: "Danke für deine Bestellung.",
+  },
+  CANCELLED: {
+    title: "Diese Bestellung wurde storniert.",
+    text: "Falls du schon bezahlt hast, erstatten wir dir den vollen Betrag.",
+  },
+  REFUNDED: {
+    title: "Diese Bestellung wurde erstattet.",
+    text: "Den vollen Betrag haben wir dir erstattet; je nach Bank dauert die Gutschrift ein paar Tage.",
+  },
+  NO_SHOW: {
+    title: "Diese Bestellung wurde nicht abgeholt.",
+    text: "Bei Fragen melde dich gern bei uns.",
+  },
+  EXPIRED: {
+    title: "Die Reservierung ist abgelaufen.",
+    text: "Die Zahlung kam nicht rechtzeitig, deshalb sind die Slots wieder frei.",
+  },
 };
+
+/** Bestellungen, für die der Abholcode gilt */
+const CODE_VISIBLE: OrderStatus[] = ["PAID", "IN_PROGRESS", "READY"];
 
 export default function OrderPage(props: PageProps<"/bestellung/[id]">) {
   return (
@@ -50,15 +83,15 @@ async function OrderContent({
   searchParams,
 }: PageProps<"/bestellung/[id]">) {
   await connection();
-  const [{ id }, { k }] = await Promise.all([params, searchParams]);
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const key = typeof query.k === "string" ? query.k : undefined;
   // Ohne gültigen Schlüssel verhält sich die Seite, als gäbe es die Bestellung nicht.
-  if (!verifyOrderKey(id, typeof k === "string" ? k : undefined)) notFound();
+  if (!key || !verifyOrderKey(id, key)) notFound();
 
   const order = await db.order.findUnique({
     where: { id },
     include: {
       items: true,
-      customer: { select: { name: true } },
       drop: { select: { title: true, slug: true, location: true } },
       slots: { orderBy: { seq: "asc" }, select: { startsAt: true } },
     },
@@ -66,11 +99,14 @@ async function OrderContent({
   if (!order) notFound();
 
   const now = new Date();
+  const pending = order.status === "PENDING_PAYMENT";
+  // Zurück von Stripe, aber der Webhook ist noch nicht da
+  const confirming = pending && query.bezahlt === "1";
   const reserved =
-    order.status === "PENDING_PAYMENT" &&
-    isOrderActive(order.status, order.expiresAt, now);
-  const expired = order.status === "PENDING_PAYMENT" && !reserved;
+    pending && !confirming && isOrderActive(order.status, order.expiresAt, now);
+  const expired = pending && !confirming && !reserved;
   const bakeFrom = order.slots[0]?.startsAt;
+  const status = STATUS[expired ? "EXPIRED" : order.status];
 
   return (
     <article className="mt-6">
@@ -80,9 +116,7 @@ async function OrderContent({
 
       {reserved && (
         <>
-          <h1 className="mt-3 text-5xl leading-[1.05]">
-            Deine Abholzeit ist reserviert.
-          </h1>
+          <Title>Deine Abholzeit ist reserviert.</Title>
           <p className="mt-4 text-lg text-ink-muted">
             Wir halten deine Slots noch{" "}
             <Countdown
@@ -94,44 +128,54 @@ async function OrderContent({
           </p>
           <div className="mt-8 rounded-md border border-line bg-surface p-5">
             <h2 className="text-2xl">Zahlung</h2>
-            <p className="mt-2 text-sm text-ink-muted">
-              Die Online-Zahlung per Karte, Apple Pay und Google Pay wird gerade
-              eingerichtet. Sobald sie freigeschaltet ist, schließt du die
-              Bestellung hier ab.
-            </p>
-            <Button size="lg" className="mt-4" disabled>
-              Jetzt bezahlen · {formatPrice(order.totalCents)}
-            </Button>
+            {isStripeConfigured() ? (
+              <>
+                <p className="mt-2 text-sm text-ink-muted">
+                  Sicher bezahlen per Karte, Apple Pay oder Google Pay. Du wirst
+                  dafür kurz zu unserem Zahlungsanbieter Stripe weitergeleitet.
+                </p>
+                <PayForm
+                  action={startPayment.bind(null, order.id, key)}
+                  label={`Jetzt bezahlen · ${formatPrice(order.totalCents)}`}
+                />
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-ink-muted">
+                Die Online-Zahlung wird gerade eingerichtet. Sobald sie
+                freigeschaltet ist, schließt du die Bestellung hier ab.
+              </p>
+            )}
           </div>
         </>
       )}
 
-      {expired && (
+      {confirming && (
         <>
-          <h1 className="mt-3 text-5xl leading-[1.05]">
-            Die Reservierung ist abgelaufen.
-          </h1>
+          <Title>Zahlung wird bestätigt …</Title>
           <p className="mt-4 text-lg text-ink-muted" role="status">
-            Die Zahlung kam nicht rechtzeitig, deshalb sind die Slots wieder
-            frei. Schau nach, ob deine Wunschzeit noch zu haben ist.
+            Das dauert meist nur ein paar Sekunden. Die Seite aktualisiert sich
+            von selbst; die Bestätigung kommt außerdem per E-Mail.
           </p>
-          <Button asChild size="lg" className="mt-8">
-            <Link href={`/drop/${order.drop.slug}`}>Neu bestellen</Link>
-          </Button>
+          <AutoRefresh everyMs={2000} maxTimes={30} />
         </>
       )}
 
-      {!reserved && !expired && (
+      {!reserved && !confirming && status && (
         <>
-          <h1 className="mt-3 text-5xl leading-[1.05]">
-            {STATUS_TITLES[order.status] ?? "Deine Bestellung"}
-          </h1>
-          <p className="mt-4 text-lg text-ink-muted">
-            Abholcode{" "}
-            <strong className="font-semibold tracking-widest text-ink">
-              {order.pickupCode}
-            </strong>
-          </p>
+          <Title>{status.title}</Title>
+          <p className="mt-4 text-lg text-ink-muted">{status.text}</p>
+          {expired && (
+            <Button asChild size="lg" className="mt-8">
+              <Link href={`/drop/${order.drop.slug}`}>Neu bestellen</Link>
+            </Button>
+          )}
+          {CODE_VISIBLE.includes(order.status) && (
+            <>
+              <PickupCode code={order.pickupCode} />
+              {/* Statusseite: Küche meldet „im Ofen“ und „abholbereit“ (Phase 5) */}
+              <AutoRefresh everyMs={15_000} />
+            </>
+          )}
         </>
       )}
 
@@ -186,5 +230,44 @@ async function OrderContent({
         </dl>
       </section>
     </article>
+  );
+}
+
+function Title({ children }: { children: ReactNode }) {
+  return <h1 className="mt-3 text-5xl leading-[1.05]">{children}</h1>;
+}
+
+async function PickupCode({ code }: { code: string }) {
+  // Die Küche scannt den Code bei der Ausgabe (Phase 5); er enthält nur den Abholcode.
+  const svg = await QRCode.toString(code, {
+    type: "svg",
+    margin: 1,
+    errorCorrectionLevel: "M",
+    color: { dark: "#2b2620", light: "#fcfaf5" },
+  });
+  return (
+    <section
+      aria-labelledby="abholcode"
+      className="mt-8 flex flex-wrap items-center gap-6 rounded-md border border-line bg-surface p-5"
+    >
+      <div
+        className="size-36 shrink-0 [&_svg]:size-full"
+        role="img"
+        aria-label={`QR-Code für Abholcode ${code}`}
+        // Vom QR-Generator aus dem eigenen Abholcode erzeugt, keine Nutzereingabe
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      <div>
+        <h2 id="abholcode" className="text-sm text-ink-muted">
+          Abholcode
+        </h2>
+        <p className="mt-1 font-mono text-4xl font-semibold tracking-[0.2em]">
+          {code}
+        </p>
+        <p className="mt-2 text-sm text-ink-muted">
+          Zeig den Code oder den QR-Code bei der Abholung.
+        </p>
+      </div>
+    </section>
   );
 }

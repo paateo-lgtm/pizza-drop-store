@@ -11,6 +11,7 @@ describe("can", () => {
   it("beschränkt die Küche auf Küche und Bestellungen", () => {
     expect(can("KITCHEN", "kitchen:use")).toBe(true);
     expect(can("KITCHEN", "orders:view")).toBe(true);
+    expect(can("KITCHEN", "orders:manage")).toBe(false);
     expect(can("KITCHEN", "pizzas:manage")).toBe(false);
     expect(can("KITCHEN", "settings:manage")).toBe(false);
     expect(can("KITCHEN", "team:manage")).toBe(false);

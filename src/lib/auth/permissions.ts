@@ -8,6 +8,7 @@ export const PERMISSIONS = [
   "pizzas:manage",
   "drops:manage",
   "orders:view",
+  "orders:manage",
   "kitchen:use",
   "reports:view",
   "content:manage",

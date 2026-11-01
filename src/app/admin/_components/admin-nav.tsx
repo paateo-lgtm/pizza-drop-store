@@ -34,7 +34,6 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
         href: "/admin/bestellungen",
         label: "Bestellungen",
         icon: ClipboardList,
-        phase: 4,
       },
       { href: "/kitchen", label: "Kitchen-Mode", icon: ChefHat, phase: 5 },
     ],
