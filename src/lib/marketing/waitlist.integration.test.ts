@@ -60,9 +60,23 @@ const entryOf = (dropId: string, key: string) =>
     where: { dropId_email: { dropId, email: email(key) } },
   });
 
+/** Drop im Verkauf, alle 4 Slots gesperrt: ausverkauft */
+async function soldOut(key: string) {
+  const drop = await f.drop(key, 4, [pizza.id]);
+  await db.slot.updateMany({
+    where: { dropId: drop.id },
+    data: { state: "BLOCKED" },
+  });
+  return drop;
+}
+
+/** Gibt alle Slots wieder frei (wie ein Storno) */
+const release = (dropId: string) =>
+  db.slot.updateMany({ where: { dropId }, data: { state: "FREE" } });
+
 describe("joinWaitlist", () => {
   it("trägt mit Anzahl ein; ein zweiter Versuch ändert nur die Anzahl", async () => {
-    const drop = await f.drop("eintragen", 4, [pizza.id]);
+    const drop = await soldOut("eintragen");
     expect(
       await joinWaitlist({
         dropId: drop.id,
@@ -79,10 +93,44 @@ describe("joinWaitlist", () => {
     ).toBe("joined");
     const second = await entryOf(drop.id, "neu");
     expect(second).toMatchObject({ id: first!.id, quantity: 3 });
+
+    // Nach der Benachrichtigung ändert ein erneutes Eintragen nichts mehr
+    await db.waitlistEntry.update({
+      where: { id: first!.id },
+      data: { notifiedAt: new Date() },
+    });
+    expect(
+      await joinWaitlist({ dropId: drop.id, email: email("neu"), quantity: 1 }),
+    ).toBe("joined");
+    expect(await entryOf(drop.id, "neu")).toMatchObject({ quantity: 3 });
+  });
+
+  it("verweist auf die Buchung, solange die Anzahl gerade buchbar ist", async () => {
+    const drop = await soldOut("buchbar");
+    await db.slot.updateMany({
+      where: { dropId: drop.id, seq: { in: [1, 2] } },
+      data: { state: "FREE" },
+    });
+    expect(
+      await joinWaitlist({
+        dropId: drop.id,
+        email: email("buchbar"),
+        quantity: 2,
+      }),
+    ).toBe("available");
+    expect(await entryOf(drop.id, "buchbar")).toBeNull();
+    // Drei am Stück gibt es nicht: Eintragen geht
+    expect(
+      await joinWaitlist({
+        dropId: drop.id,
+        email: email("buchbar"),
+        quantity: 3,
+      }),
+    ).toBe("joined");
   });
 
   it("lehnt Anzahlen außerhalb von 1 bis zum Bestelllimit ab", async () => {
-    const drop = await f.drop("anzahl", 4, [pizza.id]);
+    const drop = await soldOut("anzahl");
     for (const quantity of [0, 5, 1.5]) {
       expect(
         await joinWaitlist({ dropId: drop.id, email: email("anz"), quantity }),
@@ -92,7 +140,7 @@ describe("joinWaitlist", () => {
   });
 
   it("nimmt nur Einträge für Drops im Verkauf an", async () => {
-    const drop = await f.drop("abgesagt", 4, [pizza.id]);
+    const drop = await soldOut("abgesagt");
     await db.drop.update({
       where: { id: drop.id },
       data: { status: "CANCELLED" },
@@ -112,7 +160,7 @@ describe("joinWaitlist", () => {
 
 describe("leaveWaitlist", () => {
   it("löscht den Eintrag; ein zweiter Klick findet nichts mehr", async () => {
-    const drop = await f.drop("austragen", 4, [pizza.id]);
+    const drop = await soldOut("austragen");
     await joinWaitlist({ dropId: drop.id, email: email("raus"), quantity: 1 });
     const entry = await entryOf(drop.id, "raus");
     expect(await leaveWaitlist(entry!.token)).toBe("left");
@@ -179,9 +227,10 @@ describe("sendDueWaitlistNotices", () => {
     expect(later.mine(drop)).toEqual([email("eins")]);
   });
 
-  it("überspringt Einträge, die inzwischen selbst gebucht haben", async () => {
-    const drop = await f.drop("gebucht", 4, [pizza.id]);
+  it("überspringt Einträge, die selbst gebucht haben – solange die Buchung gilt", async () => {
+    const drop = await soldOut("gebucht");
     await joinWaitlist({ dropId: drop.id, email: email("bucht"), quantity: 1 });
+    await release(drop.id);
     const orderId = await reserveOrder({
       ...f.customer(9),
       email: email("bucht"),
@@ -201,11 +250,24 @@ describe("sendDueWaitlistNotices", () => {
       limit: 100,
     });
     expect(n.mine(drop)).toEqual([]);
+
+    // Reservierung verfällt unbezahlt: Der Eintrag wartet wieder
+    await db.order.update({
+      where: { id: orderId.orderId },
+      data: { status: "EXPIRED" },
+    });
+    const again = notices();
+    await sendDueWaitlistNotices(new Date(), {
+      sendNotice: again.sendNotice,
+      limit: 100,
+    });
+    expect(again.mine(drop)).toEqual([email("bucht")]);
   });
 
   it("vermerkt übersprungene Mails nicht als benachrichtigt", async () => {
-    const drop = await f.drop("ohne-schluessel", 4, [pizza.id]);
+    const drop = await soldOut("ohne-schluessel");
     await joinWaitlist({ dropId: drop.id, email: email("skip"), quantity: 1 });
+    await release(drop.id);
 
     const n = notices("skipped");
     const run = await sendDueWaitlistNotices(new Date(), {
@@ -218,12 +280,13 @@ describe("sendDueWaitlistNotices", () => {
   });
 
   it("schreibt nicht für Drops, die nicht mehr im Verkauf sind", async () => {
-    const drop = await f.drop("vorbei", 4, [pizza.id]);
+    const drop = await soldOut("vorbei");
     await joinWaitlist({
       dropId: drop.id,
       email: email("vorbei"),
       quantity: 1,
     });
+    await release(drop.id);
     await db.drop.update({
       where: { id: drop.id },
       data: { status: "SALE_CLOSED" },
@@ -237,9 +300,10 @@ describe("sendDueWaitlistNotices", () => {
   });
 
   it("verschickt pro Lauf höchstens das Limit", async () => {
-    const drop = await f.drop("limit", 4, [pizza.id]);
+    const drop = await soldOut("limit");
     await joinWaitlist({ dropId: drop.id, email: email("lim-1"), quantity: 1 });
     await joinWaitlist({ dropId: drop.id, email: email("lim-2"), quantity: 1 });
+    await release(drop.id);
     const n = notices();
     const run = await sendDueWaitlistNotices(new Date(), {
       sendNotice: n.sendNotice,
@@ -250,9 +314,9 @@ describe("sendDueWaitlistNotices", () => {
   });
 
   it("löscht Einträge, sobald der Drop vorbei oder abgesagt ist", async () => {
-    const past = await f.drop("gebacken", 4, [pizza.id]);
-    const cancelled = await f.drop("storniert", 4, [pizza.id]);
-    const open = await f.drop("laeuft", 4, [pizza.id]);
+    const past = await soldOut("gebacken");
+    const cancelled = await soldOut("storniert");
+    const open = await soldOut("laeuft");
     for (const drop of [past, cancelled, open]) {
       await joinWaitlist({ dropId: drop.id, email: email("weg"), quantity: 1 });
     }
