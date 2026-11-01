@@ -11,6 +11,8 @@ import { Pool, type PoolClient } from "pg";
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 2,
+  // Mehrere Testdateien teilen sich den Pool im Worker; kein pool.end() nötig.
+  allowExitOnIdle: true,
 });
 
 const HOUR = 3_600_000;
@@ -87,6 +89,7 @@ export async function createBookableDrop(key: string, slotCount = 12) {
 
   return {
     slug: tag,
+    tag,
     dropId,
     bakeStartsAt,
     emailPrefix: tag,
@@ -105,6 +108,14 @@ export async function createBookableDrop(key: string, slotCount = 12) {
       return rows;
     },
     async cleanup() {
+      // Mails und Webhook-Events dieser Bestellungen (Schlüssel enden auf die Bestell-ID)
+      await pool.query(
+        `DELETE FROM "EmailLog" WHERE split_part("dedupeKey", ':', 2) IN (SELECT id FROM "Order" WHERE "dropId" = $1)`,
+        [dropId],
+      );
+      await pool.query(`DELETE FROM "ProcessedWebhookEvent" WHERE id LIKE $1`, [
+        `evt_${tag}%`,
+      ]);
       const { rows } = await pool.query<{ customerId: string }>(
         `DELETE FROM "Order" WHERE "dropId" = $1 RETURNING "customerId"`,
         [dropId],

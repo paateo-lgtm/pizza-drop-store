@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { berlinTime, createBookableDrop, pool } from "./support/shop-data";
+import { berlinTime, createBookableDrop } from "./support/shop-data";
 
 type TestDrop = Awaited<ReturnType<typeof createBookableDrop>>;
 
@@ -26,10 +26,6 @@ test.describe("Kundenbuchung", () => {
 
   test.afterEach(async () => {
     await drop.cleanup();
-  });
-
-  test.afterAll(async () => {
-    await pool.end();
   });
 
   test("zwei Pizzen wählen, Abholzeit sichern und die Reservierung sehen", async ({

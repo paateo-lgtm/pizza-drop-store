@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { defineConfig, devices } from "@playwright/test";
+import { WEBHOOK_SECRET } from "./e2e/support/webhook";
 
 const PORT = 3100;
 
@@ -24,5 +25,7 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
+    // Webhook-Tests signieren Events selbst; ohne echtes Secret gilt ein Test-Secret.
+    env: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
   },
 });
