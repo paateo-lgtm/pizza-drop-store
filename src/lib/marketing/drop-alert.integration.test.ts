@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures } from "../../../test/db-fixtures";
 import { db } from "@/lib/db";
 import {
+  CONSENT_VERSION,
+  confirmMailsLastHour,
   confirmSubscription,
   sendDueDropAlerts,
   subscribe,
@@ -184,5 +186,87 @@ describe("sendDueDropAlerts", () => {
       if (result.remaining === 0) break;
     }
     expect(total).toBe(2);
+  });
+});
+
+describe("Review: ehrlich zählen, Limit und Schutz", () => {
+  it("meldet übersprungene und gescheiterte Mails; jeder Versuch zählt zum Limit", async () => {
+    await confirmed("zaehl-1");
+    await confirmed("zaehl-2");
+    await f.drop("zaehlen", 4, [pizza.id]);
+
+    let calls = 0;
+    const skipped = await sendDueDropAlerts(new Date(), {
+      limit: 1,
+      sendAlert: async () => {
+        calls += 1;
+        return "skipped";
+      },
+    });
+    expect(calls).toBe(1);
+    expect(skipped).toMatchObject({ sent: 0, skipped: 1, failed: 0 });
+    expect(skipped.remaining).toBeGreaterThan(0);
+
+    calls = 0;
+    const failed = await sendDueDropAlerts(new Date(), {
+      limit: 1,
+      sendAlert: async () => {
+        calls += 1;
+        throw new Error("Resend: Kontingent erschöpft");
+      },
+    });
+    expect(calls).toBe(1);
+    expect(failed).toMatchObject({ sent: 0, skipped: 0, failed: 1 });
+  });
+
+  it("schickt niemandem, der sich während des Laufs abgemeldet hat", async () => {
+    const first = await confirmed("mitten-1");
+    const second = await confirmed("mitten-2");
+    const drop = await f.drop("mitten", 4, [pizza.id]);
+
+    const sent: string[] = [];
+    await sendDueDropAlerts(new Date(), {
+      limit: 1000,
+      sendAlert: async (mail) => {
+        if (mail.dropId === drop.id && mail.to === first.email) {
+          await unsubscribe(second.token);
+        }
+        if (mail.dropId === drop.id) sent.push(mail.to);
+        return "sent";
+      },
+    });
+    expect(sent).toContain(first.email);
+    expect(sent).not.toContain(second.email);
+  });
+
+  it("verschickt keine Bestätigung, wenn das Stundenbudget erschöpft ist", async () => {
+    const c = confirmations();
+    await subscribe(email("budget"), {
+      sendConfirm: c.sendConfirm,
+      allowConfirm: async () => false,
+    });
+    expect(c.sent).toEqual([]);
+    // Die Anmeldung bleibt offen; ein späterer Versuch schickt den Link
+    const row = await db.subscriber.findUniqueOrThrow({
+      where: { email: email("budget") },
+    });
+    expect(row.status).toBe("PENDING");
+  });
+
+  it("zählt die Bestätigungsmails der letzten Stunde", async () => {
+    const before = await confirmMailsLastHour(new Date());
+    await db.emailLog.createMany({
+      data: [1, 2].map((i) => ({
+        kind: "drop-alarm-bestaetigen",
+        to: email(`zaehler-${i}`),
+        dedupeKey: `${RUN}-zaehler-${i}`,
+      })),
+    });
+    expect(await confirmMailsLastHour(new Date())).toBe(before + 2);
+  });
+
+  it("hält die Version des Einwilligungstexts fest", async () => {
+    const row = await confirmed("einwilligung");
+    expect(row.source).toContain(CONSENT_VERSION);
   });
 });
