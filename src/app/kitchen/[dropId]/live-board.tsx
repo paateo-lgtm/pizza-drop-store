@@ -7,8 +7,13 @@ import type { KitchenBoard } from "@/lib/kitchen/kitchen";
 import { loadBoardAction } from "../actions";
 import { KitchenBoardView } from "./kitchen-board";
 
-/** Mehrere Geräte bleiben über Polling synchron (docs/PLAN.md, 1.4). */
-const POLL_MS = 3000;
+/**
+ * Mehrere Geräte bleiben über Polling synchron (docs/PLAN.md, 1.4): schnell, solange eine
+ * Pizza im Ofen ist, sonst halb so oft (spart Datenbankabfragen). Beide Werte bleiben
+ * deutlich unter der Warnschwelle von 10 s (StaleNotice).
+ */
+const POLL_BUSY_MS = 3000;
+const POLL_IDLE_MS = 6000;
 
 /**
  * Hält das Board aktuell. Scheitert ein Abruf, bleibt der letzte Stand stehen;
@@ -20,6 +25,11 @@ export function LiveKitchenBoard({ initial }: { initial: KitchenBoard }) {
   const [signedOut, setSignedOut] = useState(false);
   const pathname = usePathname();
   const dropId = initial.drop.id;
+
+  // Nach eigenen Aktionen kommt über refresh() ein neuerer Stand vom Server.
+  const board =
+    polled && polled.serverNow > initial.serverNow ? polled : initial;
+  const pollMs = board.current ? POLL_BUSY_MS : POLL_IDLE_MS;
 
   useEffect(() => {
     let active = true;
@@ -37,7 +47,7 @@ export function LiveKitchenBoard({ initial }: { initial: KitchenBoard }) {
         // Kein Netz o. Ä.: alter Stand bleibt, die Warnung zeigt sein Alter.
       }
     }
-    const id = window.setInterval(load, POLL_MS);
+    const id = window.setInterval(load, pollMs);
     document.addEventListener("visibilitychange", load);
     window.addEventListener("online", load);
     return () => {
@@ -46,11 +56,7 @@ export function LiveKitchenBoard({ initial }: { initial: KitchenBoard }) {
       document.removeEventListener("visibilitychange", load);
       window.removeEventListener("online", load);
     };
-  }, [dropId]);
-
-  // Nach eigenen Aktionen kommt über refresh() ein neuerer Stand vom Server.
-  const board =
-    polled && polled.serverNow > initial.serverNow ? polled : initial;
+  }, [dropId, pollMs]);
 
   return (
     <>
