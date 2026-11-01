@@ -32,7 +32,8 @@ test.describe("Drop-Alarm", () => {
     await form.getByLabel("E-Mail-Adresse").fill(email);
     await form.getByRole("button", { name: "Drop-Alarm einschalten" }).click();
     await expect(form.getByRole("status")).toHaveText(/Fast geschafft/);
-    expect(await subscriber()).toMatchObject({ status: "PENDING" });
+    // Die Anmeldung läuft nach der Antwort (gleiche Antwortzeit für alle Adressen)
+    await expect.poll(async () => (await subscriber())?.status).toBe("PENDING");
 
     // Öffnen allein bestätigt nichts (Mail-Scanner öffnen Links automatisch)
     const { token } = await subscriber();
@@ -97,10 +98,14 @@ test.describe("Drop-Alarm", () => {
     const ok = await request.get("/api/cron/drop-alarm", {
       headers: { Authorization: `Bearer ${CRON_TEST_SECRET}` },
     });
-    expect(ok.status()).toBe(200);
-    expect(await ok.json()).toEqual({
+    const run = await ok.json();
+    expect(run).toEqual({
       sent: expect.any(Number),
+      skipped: expect.any(Number),
+      failed: expect.any(Number),
       remaining: expect.any(Number),
     });
+    // Der Testserver hat keinen Resend-Schlüssel: Übersprungenes macht den Lauf rot.
+    expect(ok.status()).toBe(run.skipped > 0 ? 503 : 200);
   });
 });

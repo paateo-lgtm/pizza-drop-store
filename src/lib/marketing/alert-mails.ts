@@ -4,14 +4,21 @@ import { NoticeMail } from "@/emails/notice-mail";
 import { formatLongDate, formatTime } from "@/lib/format";
 import { sendMail } from "@/lib/mail/send";
 import { appUrl } from "@/lib/payment/order-mails";
-import type { AlertMail, ConfirmMail } from "./drop-alert";
+import {
+  CONFIRM_MAIL_KIND,
+  type AlertMail,
+  type ConfirmMail,
+} from "./drop-alert";
+
+/** Kein Zeilenumbruch aus Admin-Texten in Kopfzeilen wie dem Betreff */
+const oneLine = (text: string) => text.replace(/[\r\n]+/g, " ").trim();
 
 const link = (path: string, token: string) =>
   `${appUrl()}${path}?t=${encodeURIComponent(token)}`;
 
 export function sendConfirmMail(mail: ConfirmMail) {
   return sendMail({
-    kind: "drop-alarm-bestaetigen",
+    kind: CONFIRM_MAIL_KIND,
     to: mail.to,
     dedupeKey: mail.dedupeKey,
     subject: "Bitte bestätige deinen Drop-Alarm",
@@ -38,7 +45,7 @@ export function sendAlertMail(mail: AlertMail) {
     kind: "drop-alarm",
     to: mail.to,
     dedupeKey: mail.dedupeKey,
-    subject: `Der Drop „${mail.dropTitle}“ ist offen`,
+    subject: `Der Drop „${oneLine(mail.dropTitle)}“ ist offen`,
     // Abmelden mit einem Klick direkt im Mailprogramm (RFC 8058)
     headers: {
       "List-Unsubscribe": `<${oneClick}>`,

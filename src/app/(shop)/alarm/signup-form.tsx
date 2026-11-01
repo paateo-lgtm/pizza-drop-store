@@ -42,6 +42,10 @@ export function AlarmSignup() {
           size="lg"
           className="h-12 aria-disabled:opacity-50"
           aria-disabled={pending}
+          onClick={(e) => {
+            // Doppelklick während des Sendens: kein zweites Absenden
+            if (pending) e.preventDefault();
+          }}
         >
           {pending ? "Wird gesendet …" : "Drop-Alarm einschalten"}
         </Button>
@@ -55,13 +59,11 @@ export function AlarmSignup() {
         </Link>
         .
       </p>
-      <p
-        role="status"
-        className={
-          state?.ok === false ? "mt-3 text-terracotta" : "mt-3 text-olive"
-        }
-      >
-        {state?.message}
+      <p role="status" className="mt-3 text-olive">
+        {state?.ok ? state.message : null}
+      </p>
+      <p role="alert" className="mt-3 text-terracotta">
+        {state?.ok === false ? `Fehler: ${state.message}` : null}
       </p>
     </form>
   );

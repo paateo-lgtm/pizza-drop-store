@@ -33,6 +33,14 @@ async function Content({
       />
     );
   }
+  if (status === "error") {
+    return (
+      <AlarmPage
+        title="Das hat gerade nicht geklappt."
+        text="Bitte öffne den Link aus der Mail gleich noch einmal."
+      />
+    );
+  }
   if (status === "invalid" || !token) {
     return (
       <AlarmPage

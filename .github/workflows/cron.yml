@@ -28,6 +28,9 @@ jobs:
             echo "::error::Secret CRON_SECRET fehlt"
             exit 1
           fi
+          # Kurzer Aussetzer (Deploy, Netz): bis zu 3 Wiederholungen. Ein 503 der App
+          # (z. B. Resend-Schlüssel fehlt) bleibt danach rot: GitHub mailt bei Fehlschlag.
           curl --fail-with-body --silent --show-error --max-time 90 \
+            --retry 3 --retry-all-errors --retry-delay 10 \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$APP_URL/api/cron/drop-alarm"
