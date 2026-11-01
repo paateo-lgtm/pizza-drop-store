@@ -22,6 +22,11 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Der Link-Schlüssel (?k=) soll nicht per Referer an andere Seiten gehen.
+        source: "/bestellung/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
     ];
   },
   partialPrefetching: true,

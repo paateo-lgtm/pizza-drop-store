@@ -10,7 +10,7 @@ const optionalText = (max: number, message: string) =>
 
 /** Checkout-Daten; Preise und Namen der Pizzen bestimmt der Server, nicht das Formular. */
 export const reservationSchema = z.object({
-  dropId: z.string().min(1),
+  dropId: z.string().min(1).max(40),
   startSeq: z
     .number({ error: "Bitte eine Abholzeit wählen." })
     .int("Bitte eine Abholzeit wählen.")
@@ -18,7 +18,7 @@ export const reservationSchema = z.object({
   items: z
     .array(
       z.object({
-        pizzaId: z.string().min(1),
+        pizzaId: z.string().min(1).max(40),
         quantity: z
           .number({ error: "Bitte gültige Mengen wählen." })
           .int("Bitte gültige Mengen wählen.")

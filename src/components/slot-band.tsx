@@ -10,7 +10,7 @@ const stateClass: Record<SlotBandState, string> = {
     "border-line bg-[repeating-linear-gradient(135deg,var(--line)_0_2px,transparent_2px_5px)]",
   selected: "bg-olive border-transparent",
   done: "bg-olive/40 border-transparent",
-  current: "bg-terracotta border-transparent animate-pulse",
+  current: "bg-terracotta border-transparent motion-safe:animate-pulse",
 };
 
 /**

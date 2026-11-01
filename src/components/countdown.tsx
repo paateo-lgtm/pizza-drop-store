@@ -52,7 +52,9 @@ export function Countdown({
       setRemaining(left);
       return left;
     };
-    let done = false;
+    // Nur neu laden, wenn der Countdown hier über 0 läuft. War er schon beim Laden abgelaufen
+    // (z. B. Uhr des Servers knapp daneben), würde sonst jede Sekunde neu geladen.
+    let done = target.getTime() - serverNow.getTime() <= 0;
     const id = window.setInterval(() => {
       if (tick() <= 0 && !done) {
         done = true;
@@ -67,7 +69,8 @@ export function Countdown({
     <time
       dateTime={target.toISOString()}
       className={className}
-      // Nur Screenreader-Nutzer, die nachfragen, hören die Zeit; kein Vorlesen jede Sekunde.
+      // Timer werden nicht von selbst vorgelesen; kein Vorlesen jede Sekunde.
+      role="timer"
       aria-live="off"
     >
       <span className="tabular-nums">{formatCountdown(remaining)}</span>

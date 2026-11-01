@@ -100,6 +100,10 @@ test.describe("Kundenbuchung", () => {
     ).toHaveText(
       "Diese Abholzeit ist gerade vergeben worden. Bitte wähle eine andere.",
     );
+    // Der Fokus landet auf der Meldung, nicht auf <body>
+    await expect(
+      page.getByRole("alert").filter({ hasText: "vergeben" }),
+    ).toBeFocused();
     // Die vergebene Zeit ist verschwunden, die nächste ist wählbar
     await expect(page.getByRole("radio", { name: pickup })).toHaveCount(0);
     await expect(

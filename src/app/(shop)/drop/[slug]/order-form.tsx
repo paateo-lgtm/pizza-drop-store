@@ -3,7 +3,14 @@
 import { Minus, Plus } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import { SlotBand, type SlotBandState } from "@/components/slot-band";
 import { Button } from "@/components/ui/button";
@@ -62,11 +69,27 @@ export function OrderForm({
     { ok: false }
   > | null>(null);
   const [pending, startTransition] = useTransition();
+  // Nach Erfolg bleibt das Formular gesperrt, bis die Bestellseite geladen ist.
+  const [redirecting, setRedirecting] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const router = useRouter();
+  const busy = pending || redirecting;
 
-  // Mengen nur für Pizzen, die noch auf der Karte stehen
+  // Nach einem Fehler den Fokus auf die Meldung setzen, statt ihn auf <body> fallen zu lassen.
+  useEffect(() => {
+    if (result) errorRef.current?.focus();
+  }, [result]);
+
+  // Mengen nur für Pizzen auf der Karte, gedeckelt durch den aktuellen Rest der Sorte
+  // (nach einem Konflikt kann der Server weniger melden, als gewählt war).
+  const quantityOf = (p: OrderMenuItem) =>
+    Math.min(quantities[p.pizzaId] ?? 0, p.left ?? Infinity);
+  const reduced = menu.some(
+    (p) => (quantities[p.pizzaId] ?? 0) > quantityOf(p),
+  );
   const lines = menu
-    .map((p) => ({ pizza: p, quantity: quantities[p.pizzaId] ?? 0 }))
+    .map((p) => ({ pizza: p, quantity: quantityOf(p) }))
     .filter((l) => l.quantity > 0);
   const count = lines.reduce((sum, l) => sum + l.quantity, 0);
   const total = lines.reduce(
@@ -75,20 +98,28 @@ export function OrderForm({
   );
   const limit = Math.min(maxPerOrder, remaining);
 
-  const options = pickupOptions(slots, count, earliestStart);
+  const tooMany = count > limit;
+  const options = tooMany ? [] : pickupOptions(slots, count, earliestStart);
   const selected = options.find((o) => o.startSeq === startSeq) ?? null;
   const errors = result?.fieldErrors ?? {};
 
-  function change(id: string, delta: number) {
-    setQuantities((prev) => ({
-      ...prev,
-      [id]: Math.max(0, (prev[id] ?? 0) + delta),
-    }));
+  function change(pizza: OrderMenuItem, delta: number) {
+    const next = Math.max(0, quantityOf(pizza) + delta);
+    setQuantities((prev) => ({ ...prev, [pizza.pizzaId]: next }));
+    // Andere Menge = andere Abholzeiten; eine alte Auswahl würde still verrutschen.
+    setStartSeq(null);
+    setAnnouncement(`${pizza.name}: ${next}`);
+  }
+
+  function select(option: PickupOption) {
+    setStartSeq(option.startSeq);
+    setAnnouncement(`Abholung ${formatTime(option.pickupAt)} Uhr gewählt`);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selected) return;
+    if (!selected || busy) return;
+    setResult(null);
     const data = new FormData(event.currentTarget);
     const payload = {
       dropId,
@@ -114,6 +145,7 @@ export function OrderForm({
         return;
       }
       if (state.ok) {
+        setRedirecting(true);
         router.push(state.href);
         return;
       }
@@ -131,6 +163,7 @@ export function OrderForm({
     <form
       onSubmit={submit}
       noValidate
+      aria-busy={busy}
       className="grid gap-16 pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-20 lg:pb-0"
     >
       <div className="flex min-w-0 flex-col gap-16">
@@ -147,17 +180,25 @@ export function OrderForm({
               <MenuRow
                 key={pizza.pizzaId}
                 pizza={pizza}
-                quantity={quantities[pizza.pizzaId] ?? 0}
+                quantity={quantityOf(pizza)}
                 open={open}
                 canAdd={
                   count < limit &&
-                  (pizza.left === null ||
-                    (quantities[pizza.pizzaId] ?? 0) < pizza.left)
+                  (pizza.left === null || quantityOf(pizza) < pizza.left)
                 }
-                onChange={(delta) => change(pizza.pizzaId, delta)}
+                onChange={(delta) => change(pizza, delta)}
               />
             ))}
           </ul>
+          {reduced && (
+            <p className="mt-4 text-sm text-terracotta">
+              Einige Sorten sind inzwischen knapp. Wir haben deine Mengen an das
+              angepasst, was noch da ist.
+            </p>
+          )}
+          <p role="status" className="sr-only">
+            {announcement}
+          </p>
         </section>
 
         {open ? (
@@ -166,12 +207,19 @@ export function OrderForm({
               <StepHeading id="abholzeit" step={2}>
                 Abholzeit
               </StepHeading>
-              <PickupPicker
-                count={count}
-                options={options}
-                selected={selected}
-                onSelect={setStartSeq}
-              />
+              {tooMany ? (
+                <p className="mt-4 text-terracotta">
+                  Für diesen Drop sind nur noch {pizzaCount(limit)} frei. Bitte
+                  verringere deine Auswahl.
+                </p>
+              ) : (
+                <PickupPicker
+                  count={count}
+                  options={options}
+                  selected={selected}
+                  onSelect={select}
+                />
+              )}
             </section>
 
             <section aria-labelledby="angaben" className="scroll-mt-6">
@@ -186,6 +234,7 @@ export function OrderForm({
                     autoComplete="name"
                     required
                     aria-invalid={!!errors.name}
+                    aria-describedby={errors.name ? "name-error" : undefined}
                   />
                 </Field>
                 <Field label="Telefon" name="phone" error={errors.phone}>
@@ -196,6 +245,7 @@ export function OrderForm({
                     autoComplete="tel"
                     required
                     aria-invalid={!!errors.phone}
+                    aria-describedby={errors.phone ? "phone-error" : undefined}
                   />
                 </Field>
                 <Field
@@ -212,6 +262,7 @@ export function OrderForm({
                     autoComplete="email"
                     required
                     aria-invalid={!!errors.email}
+                    aria-describedby={errors.email ? "email-error" : undefined}
                   />
                 </Field>
                 <Field
@@ -220,7 +271,14 @@ export function OrderForm({
                   error={errors.note}
                   className="sm:col-span-2"
                 >
-                  <Textarea id="note" name="note" rows={2} maxLength={300} />
+                  <Textarea
+                    id="note"
+                    name="note"
+                    rows={2}
+                    maxLength={300}
+                    aria-invalid={!!errors.note}
+                    aria-describedby={errors.note ? "note-error" : undefined}
+                  />
                 </Field>
                 <div className="flex items-start gap-3 text-sm sm:col-span-2">
                   <Checkbox
@@ -298,18 +356,24 @@ export function OrderForm({
             </dl>
 
             {result && (
-              <p role="alert" className="mt-4 text-sm text-terracotta">
+              <p
+                ref={errorRef}
+                role="alert"
+                tabIndex={-1}
+                className="mt-4 text-sm text-terracotta outline-none"
+              >
                 {result.message}
               </p>
             )}
 
+            {/* aria-disabled statt disabled: Der Fokus bleibt beim Absenden am Button. */}
             <Button
               type="submit"
               size="lg"
-              className="mt-6 w-full"
-              disabled={!selected || pending}
+              className="mt-6 w-full aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              aria-disabled={!selected || busy}
             >
-              {pending ? "Wird reserviert …" : "Abholzeit reservieren"}
+              {busy ? "Wird reserviert …" : "Abholzeit reservieren"}
             </Button>
             <p className="mt-3 text-xs text-ink-muted">
               Deine Slots sind danach {reservationMinutes} Minuten für dich
@@ -430,7 +494,6 @@ function MenuRow({
           <output
             className="w-6 text-center tabular-nums"
             aria-label={`${pizza.name}: Anzahl`}
-            aria-live="polite"
           >
             {quantity}
           </output>
@@ -459,7 +522,7 @@ function PickupPicker({
   count: number;
   options: PickupOption[];
   selected: PickupOption | null;
-  onSelect: (startSeq: number) => void;
+  onSelect: (option: PickupOption) => void;
 }) {
   if (count === 0) {
     return (
@@ -471,8 +534,8 @@ function PickupPicker({
   if (options.length === 0) {
     return (
       <p className="mt-4 text-terracotta">
-        Für {pizzaCount(count)} sind keine {count} Slots am Stück mehr frei.
-        Versuch es mit weniger Pizzen.
+        Für {pizzaCount(count)} ist keine passende Abholzeit mehr frei. Versuch
+        es mit weniger Pizzen.
       </p>
     );
   }
@@ -516,7 +579,7 @@ function PickupPicker({
                       name="pickup"
                       value={option.startSeq}
                       checked={active}
-                      onChange={() => onSelect(option.startSeq)}
+                      onChange={() => onSelect(option)}
                       className="sr-only"
                     />
                     {formatTime(option.pickupAt)}
@@ -528,7 +591,7 @@ function PickupPicker({
         ))}
       </div>
       {selected && (
-        <p className="mt-6 text-sm" aria-live="polite">
+        <p className="mt-6 text-sm">
           Abholung{" "}
           <strong className="font-semibold text-terracotta">
             {formatTime(selected.pickupAt)} Uhr
@@ -566,7 +629,9 @@ function Field({
       </label>
       {children}
       {error?.[0] ? (
-        <p className="text-sm text-terracotta">{error[0]}</p>
+        <p id={`${name}-error`} className="text-sm text-terracotta">
+          {error[0]}
+        </p>
       ) : (
         hint && <p className="text-xs text-ink-muted">{hint}</p>
       )}
@@ -584,7 +649,7 @@ function MobileBar({
   selected: PickupOption | null;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
         <p className="text-sm">
           <span className="font-medium">{pizzaCount(count)}</span>

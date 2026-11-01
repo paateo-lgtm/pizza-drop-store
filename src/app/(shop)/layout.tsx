@@ -5,6 +5,12 @@ import { Toaster } from "@/components/ui/sonner";
 export default function ShopLayout({ children }: LayoutProps<"/">) {
   return (
     <>
+      <a
+        href="#inhalt"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:ring-[3px] focus:ring-ring/50"
+      >
+        Zum Inhalt springen
+      </a>
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-6 sm:px-8">
         <Link href="/" aria-label="Pizza Drop – Startseite">
           <Wordmark />
@@ -16,7 +22,9 @@ export default function ShopLayout({ children }: LayoutProps<"/">) {
         </nav>
       </header>
 
-      <main className="flex-1">{children}</main>
+      <main id="inhalt" className="flex-1">
+        {children}
+      </main>
 
       <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 border-t border-line px-4 py-8 text-sm sm:px-8">
         <Wordmark className="text-xl" />
@@ -26,7 +34,7 @@ export default function ShopLayout({ children }: LayoutProps<"/">) {
           <Link href="/agb">AGB</Link>
         </nav>
       </footer>
-      <Toaster position="bottom-center" />
+      <Toaster position="top-center" />
     </>
   );
 }

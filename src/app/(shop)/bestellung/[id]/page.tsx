@@ -16,6 +16,17 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+const STATUS_TITLES: Partial<Record<string, string>> = {
+  PAID: "Bezahlt – wir backen für dich.",
+  IN_PROGRESS: "Deine Pizzen sind im Ofen.",
+  READY: "Abholbereit!",
+  PICKED_UP: "Abgeholt. Guten Appetit!",
+  CANCELLED: "Diese Bestellung wurde storniert.",
+  REFUNDED: "Diese Bestellung wurde erstattet.",
+  NO_SHOW: "Diese Bestellung wurde nicht abgeholt.",
+  EXPIRED: "Die Reservierung ist abgelaufen.",
+};
+
 export default function OrderPage(props: PageProps<"/bestellung/[id]">) {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pt-6 pb-20 sm:px-8">
@@ -72,7 +83,7 @@ async function OrderContent({
           <h1 className="mt-3 text-5xl leading-[1.05]">
             Deine Abholzeit ist reserviert.
           </h1>
-          <p className="mt-4 text-lg text-ink-muted" role="status">
+          <p className="mt-4 text-lg text-ink-muted">
             Wir halten deine Slots noch{" "}
             <Countdown
               target={order.expiresAt}
@@ -111,7 +122,17 @@ async function OrderContent({
       )}
 
       {!reserved && !expired && (
-        <h1 className="mt-3 text-5xl leading-[1.05]">Deine Bestellung</h1>
+        <>
+          <h1 className="mt-3 text-5xl leading-[1.05]">
+            {STATUS_TITLES[order.status] ?? "Deine Bestellung"}
+          </h1>
+          <p className="mt-4 text-lg text-ink-muted">
+            Abholcode{" "}
+            <strong className="font-semibold tracking-widest text-ink">
+              {order.pickupCode}
+            </strong>
+          </p>
+        </>
       )}
 
       <dl className="mt-12 grid gap-x-8 gap-y-5 border-t border-line pt-8 sm:grid-cols-2">

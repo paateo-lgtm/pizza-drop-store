@@ -251,6 +251,59 @@ describe("reserveOrder", () => {
     expect(await db.order.count({ where: { dropId: drop.id } })).toBe(0);
   });
 
+  it("überschreibt fremde Kundendaten nicht und speichert den Kontakt an der Bestellung", async () => {
+    const drop = await createDrop("kontakt", {
+      slotCount: 5,
+      pizzas: [{ id: margherita.id }],
+    });
+    const first = await reserveOrder(
+      input(drop.id, 600, 1, [{ pizzaId: margherita.id, quantity: 1 }]),
+    );
+    // Jemand anderes bestellt mit derselben E-Mail, aber eigenem Namen und Telefon
+    const second = await reserveOrder({
+      ...input(drop.id, 600, 3, [{ pizzaId: margherita.id, quantity: 1 }]),
+      name: "Fremder",
+      phone: "0999 999999",
+    });
+    expect(first.ok && second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+
+    const customer = await db.customer.findUniqueOrThrow({
+      where: { email: `${RUN}-600@pizzadrop.test` },
+    });
+    expect(customer).toMatchObject({ name: "Gast 600", phone: "0171 2345678" });
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: second.orderId },
+    });
+    expect(order).toMatchObject({
+      customerId: customer.id,
+      customerName: "Fremder",
+      customerPhone: "0999 999999",
+    });
+  });
+
+  it("gibt die offene Reservierung derselben E-Mail frei, wenn sie neu bucht", async () => {
+    const drop = await createDrop("neu-buchen", {
+      slotCount: 6,
+      pizzas: [{ id: margherita.id }],
+    });
+    const first = await reserveOrder(
+      input(drop.id, 700, 1, [{ pizzaId: margherita.id, quantity: 2 }]),
+    );
+    const second = await reserveOrder(
+      input(drop.id, 700, 4, [{ pizzaId: margherita.id, quantity: 1 }]),
+    );
+    expect(first.ok && second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+
+    const slots = await occupiedSlots(drop.id);
+    expect(slots.map((s) => [s.seq, s.orderId])).toEqual([[4, second.orderId]]);
+    const old = await db.order.findUniqueOrThrow({
+      where: { id: first.orderId },
+    });
+    expect(old.status).toBe("EXPIRED");
+  });
+
   it("lehnt ungültige Checkout-Daten mit Feldfehlern ab", async () => {
     const result = await reserveOrder({ dropId: "x", startSeq: 1, items: [] });
     expect(result).toMatchObject({

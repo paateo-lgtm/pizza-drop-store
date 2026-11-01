@@ -180,6 +180,9 @@ model Order {
   number                Int             @unique @default(autoincrement())
   dropId                String
   customerId            String
+  /// Kontakt zum Zeitpunkt der Bestellung; der Kundendatensatz wird nie von außen überschrieben
+  customerName          String
+  customerPhone         String
   status                OrderStatus     @default(PENDING_PAYMENT)
   subtotalCents         Int
   discountCents         Int             @default(0)

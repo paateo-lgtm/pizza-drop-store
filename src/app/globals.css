@@ -169,3 +169,10 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Auf dem Handy liegt unten die Bestellleiste: fokussierte Felder nicht darunter scrollen */
+@media (width < 64rem) {
+  html {
+    scroll-padding-bottom: 6rem;
+  }
+}

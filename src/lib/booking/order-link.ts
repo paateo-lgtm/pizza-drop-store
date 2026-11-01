@@ -1,15 +1,18 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+/** Eigenes Secret, damit ein Wechsel des Session-Secrets keine verschickten Links entwertet. */
+const linkSecret = () =>
+  process.env.ORDER_LINK_SECRET ?? process.env.SESSION_SECRET;
+
 /**
  * Bestellseiten sind ohne Login erreichbar. Der Link enthält deshalb neben der ID einen
  * HMAC-Schlüssel; ohne ihn lässt sich eine fremde Bestellung nicht aufrufen.
  */
-export function orderKey(
-  orderId: string,
-  secret = process.env.SESSION_SECRET,
-): string {
+export function orderKey(orderId: string, secret = linkSecret()): string {
   if (!secret || secret.length < 32) {
-    throw new Error("SESSION_SECRET fehlt oder ist kürzer als 32 Zeichen");
+    throw new Error(
+      "ORDER_LINK_SECRET (bzw. SESSION_SECRET) fehlt oder ist kürzer als 32 Zeichen",
+    );
   }
   return createHmac("sha256", secret)
     .update(`order-link:${orderId}`)
@@ -19,7 +22,7 @@ export function orderKey(
 export function verifyOrderKey(
   orderId: string,
   key: string | undefined,
-  secret = process.env.SESSION_SECRET,
+  secret = linkSecret(),
 ): boolean {
   if (!key) return false;
   const expected = Buffer.from(orderKey(orderId, secret));
