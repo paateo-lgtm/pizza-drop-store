@@ -97,16 +97,23 @@ export async function createBookableDrop(key: string, slotCount = 12) {
       const { rows } = await pool.query<{
         status: string;
         totalCents: number;
-        pickupCode: string;
         seqs: number[];
       }>(
-        `SELECT o.status, o."totalCents", o."pickupCode",
+        `SELECT o.status, o."totalCents",
            array_agg(s.seq ORDER BY s.seq) FILTER (WHERE s.seq IS NOT NULL) AS seqs
          FROM "Order" o LEFT JOIN "Slot" s ON s."orderId" = o.id
          WHERE o."dropId" = $1 GROUP BY o.id`,
         [dropId],
       );
       return rows;
+    },
+    /** Abholcodes der Bestellungen (für den QR-Scan in der Küche) */
+    async pickupCodes() {
+      const { rows } = await pool.query<{ pickupCode: string }>(
+        `SELECT "pickupCode" FROM "Order" WHERE "dropId" = $1 ORDER BY number`,
+        [dropId],
+      );
+      return rows.map((r) => r.pickupCode);
     },
     async cleanup() {
       // Mails und Webhook-Events dieser Bestellungen (Schlüssel enden auf die Bestell-ID)

@@ -185,7 +185,7 @@ test.describe("Kitchen-Mode", () => {
       orderId,
       paymentIntentId: `pi_${drop.tag}`,
     });
-    const [{ pickupCode }] = await drop.orders();
+    const [pickupCode] = await drop.pickupCodes();
 
     const device = await kitchenDevice(browser, drop.dropId);
     // Kamera und BarcodeDetector nachbilden: Der „Scan“ liefert den Abholcode.
