@@ -29,6 +29,16 @@ describe("projectSellOut", () => {
     expect(counts(menu, 12)).toEqual({ margherita: 8, marinara: 2, funghi: 2 });
   });
 
+  it("rechnet eine neue Sorte ohne Historie wie eine durchschnittliche Sorte", () => {
+    const menu = [
+      pizza("margherita", 0, { pastSold: 30 }),
+      pizza("marinara", 0, { pastSold: 10 }),
+      pizza("neu", 0),
+    ];
+    // Neu bekommt 1/3; die anderen teilen 2/3 im Verhältnis 3 : 1
+    expect(counts(menu, 12)).toEqual({ margherita: 6, marinara: 2, neu: 4 });
+  });
+
   it("nimmt ohne frühere Drops den aktuellen Verkauf als Verteilung", () => {
     const menu = [pizza("margherita", 3), pizza("marinara", 1)];
     expect(counts(menu, 8)).toEqual({ margherita: 6, marinara: 2 });
