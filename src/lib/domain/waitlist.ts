@@ -7,28 +7,34 @@ import { pickupOptions, type BookingSlot } from "./booking";
 export type WaitingEntry = { id: string; quantity: number };
 
 /**
- * Einträge (älteste zuerst), die jetzt Bescheid bekommen: Für ihre Anzahl muss eine Folge
- * freier Slots buchbar sein, und zusammen dürfen sie nicht mehr Pizzen wollen, als
- * `available` hergibt. Wer nicht passt, wird übersprungen; spätere kleinere Wünsche
- * können trotzdem dran sein. Wer zuerst bucht, bekommt die Slots.
+ * Einträge (älteste zuerst), die jetzt Bescheid bekommen. Jeder bekommt gedanklich eine
+ * konkrete Folge freier Slots (die früheste), damit zwei Benachrichtigte nicht auf
+ * denselben Block hoffen. `promised` sind frisch Benachrichtigte: Ihre Slots sind
+ * zuerst vergeben. Zusammen gibt es höchstens `available` Pizzen (Obergrenze des Drops).
+ * Wer nicht passt, wird übersprungen; spätere kleinere Wünsche können trotzdem dran sein.
  */
-export function entriesToNotify(
-  entries: readonly WaitingEntry[],
-  slots: readonly BookingSlot[],
-  earliestStart: Date,
-  available: number,
-): string[] {
-  const chosen: string[] = [];
-  let left = available;
-  for (const entry of entries) {
-    if (entry.quantity > left) continue;
-    if (pickupOptions(slots, entry.quantity, earliestStart).length === 0) {
-      continue;
-    }
-    chosen.push(entry.id);
+export function entriesToNotify(input: {
+  waiting: readonly WaitingEntry[];
+  promised: readonly WaitingEntry[];
+  slots: readonly BookingSlot[];
+  earliestStart: Date;
+  available: number;
+}): string[] {
+  let slots = input.slots;
+  let left = input.available;
+  const take = (entry: WaitingEntry) => {
+    if (entry.quantity > left) return false;
+    const [option] = pickupOptions(slots, entry.quantity, input.earliestStart);
+    if (!option) return false;
+    const seqs = new Set(option.seqs);
+    slots = slots.map((s) =>
+      seqs.has(s.seq) ? { ...s, status: "reserved" as const } : s,
+    );
     left -= entry.quantity;
-  }
-  return chosen;
+    return true;
+  };
+  input.promised.forEach(take);
+  return input.waiting.filter(take).map((e) => e.id);
 }
 
 /** Jeder Eintrag wird höchstens einmal benachrichtigt. */

@@ -6,8 +6,9 @@
  */
 import "server-only";
 import { loadAvailability } from "@/lib/booking/availability";
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { effectiveStatus } from "@/lib/domain/drops";
+import { pickupOptions, SOLD_ORDER_STATUSES } from "@/lib/domain/booking";
 import { entriesToNotify, waitlistMailKey } from "@/lib/domain/waitlist";
 import type { MailResult } from "@/lib/mail/send";
 import { getSettings } from "@/lib/settings";
@@ -32,15 +33,39 @@ export type WaitlistNotice = {
 export const NOTICE_HEAD_START_MINUTES = 15;
 
 /**
- * Eintragen oder die Anzahl ändern. Die Antwort verrät nicht, ob die Adresse schon
- * eingetragen war. Es geht keine Mail hinaus: Geschrieben wird erst, wenn Slots frei werden.
+ * Ohne gültige eigene Buchung: nie gebucht, oder die Reservierung ist verfallen bzw.
+ * die Bestellung storniert. Solche Einträge warten (wieder).
+ */
+const withoutBooking = (now: Date): Prisma.WaitlistEntryWhereInput => ({
+  OR: [
+    { convertedOrderId: null },
+    {
+      convertedOrder: {
+        status: { notIn: [...SOLD_ORDER_STATUSES, "PENDING_PAYMENT"] },
+      },
+    },
+    { convertedOrder: { status: "PENDING_PAYMENT", expiresAt: { lte: now } } },
+  ],
+});
+
+/**
+ * Eintragen oder die Anzahl ändern, solange die gewünschte Anzahl gerade nicht buchbar
+ * ist. Die Antwort verrät nicht, ob die Adresse schon eingetragen war. Es geht keine
+ * Mail hinaus: Geschrieben wird erst, wenn Slots frei werden.
  */
 export async function joinWaitlist(
   input: { dropId: string; email: string; quantity: number },
   now = new Date(),
-): Promise<"joined" | "closed" | "invalid"> {
-  const drop = await db.drop.findUnique({ where: { id: input.dropId } });
-  if (!drop || effectiveStatus(drop, now) !== "ON_SALE") return "closed";
+): Promise<"joined" | "available" | "closed" | "invalid"> {
+  const { reservationMinutes } = await getSettings();
+  const availability = await loadAvailability(
+    db,
+    { id: input.dropId },
+    now,
+    reservationMinutes,
+  );
+  if (availability?.drop.status !== "ON_SALE") return "closed";
+  const { drop, slots, earliestStart, remaining } = availability;
   const { quantity } = input;
   if (
     !Number.isInteger(quantity) ||
@@ -49,11 +74,28 @@ export async function joinWaitlist(
   ) {
     return "invalid";
   }
+  // Wer jetzt buchen kann, soll buchen: Sonst ginge die Mail sofort beim nächsten Lauf raus.
+  if (
+    quantity <= remaining &&
+    pickupOptions(slots, quantity, earliestStart).length > 0
+  ) {
+    return "available";
+  }
+
   const email = normalizeEmail(input.email);
-  await db.waitlistEntry.upsert({
-    where: { dropId_email: { dropId: drop.id, email } },
-    update: { quantity },
-    create: { dropId: drop.id, email, quantity, token: newToken() },
+  await db.waitlistEntry.createMany({
+    data: [{ dropId: drop.id, email, quantity, token: newToken() }],
+    skipDuplicates: true,
+  });
+  // Nach Benachrichtigung oder Buchung bleibt der Eintrag, wie er war.
+  await db.waitlistEntry.updateMany({
+    where: {
+      dropId: drop.id,
+      email,
+      notifiedAt: null,
+      convertedOrderId: null,
+    },
+    data: { quantity },
   });
   return "joined";
 }
@@ -86,12 +128,11 @@ export async function sendDueWaitlistNotices(
     },
   });
 
-  const open = { notifiedAt: null, convertedOrderId: null };
   const drops = await db.drop.findMany({
     where: {
       status: { in: ["SCHEDULED", "ON_SALE"] },
       saleEndsAt: { gt: now },
-      waitlist: { some: open },
+      waitlist: { some: { notifiedAt: null, ...withoutBooking(now) } },
     },
     orderBy: { saleStartsAt: "asc" },
     select: { id: true },
@@ -113,20 +154,26 @@ export async function sendDueWaitlistNotices(
     if (availability?.drop.status !== "ON_SALE") continue;
     const { drop, slots, earliestStart, remaining } = availability;
 
+    // Wer gerade selbst gebucht hat, hält seine Slots schon per Reservierung.
     const entries = await db.waitlistEntry.findMany({
       where: {
         dropId: id,
-        convertedOrderId: null,
-        OR: [{ notifiedAt: null }, { notifiedAt: { gt: headStart } }],
+        AND: [
+          withoutBooking(now),
+          { OR: [{ notifiedAt: null }, { notifiedAt: { gt: headStart } }] },
+        ],
       },
       orderBy: { createdAt: "asc" },
     });
-    const promised = entries
-      .filter((e) => e.notifiedAt !== null)
-      .reduce((sum, e) => sum + e.quantity, 0);
     const waiting = entries.filter((e) => e.notifiedAt === null);
     const due = new Set(
-      entriesToNotify(waiting, slots, earliestStart, remaining - promised),
+      entriesToNotify({
+        waiting,
+        promised: entries.filter((e) => e.notifiedAt !== null),
+        slots,
+        earliestStart,
+        available: remaining,
+      }),
     );
 
     for (const entry of waiting.filter((e) => due.has(e.id))) {

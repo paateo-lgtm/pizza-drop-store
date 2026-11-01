@@ -200,9 +200,10 @@ async function reserveInTransaction(
     select: { id: true },
   });
 
-  // Wer selbst bucht, braucht von der Warteliste keine Nachricht mehr.
+  // Wer selbst bucht, braucht von der Warteliste keine Nachricht mehr – solange die
+  // Buchung gilt (die Warteliste prüft den Status dieser Bestellung).
   await tx.waitlistEntry.updateMany({
-    where: { dropId: drop.id, email: input.email, convertedOrderId: null },
+    where: { dropId: drop.id, email: input.email },
     data: { convertedOrderId: order.id },
   });
 

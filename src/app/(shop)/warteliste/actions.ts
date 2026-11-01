@@ -39,6 +39,13 @@ export async function joinWaitlistAction(
     if (result === "closed") {
       return { ok: false, message: "Für diesen Drop läuft kein Verkauf mehr." };
     }
+    if (result === "available") {
+      return {
+        ok: false,
+        message:
+          "Gerade sind wieder Slots frei – lade die Seite neu und buche direkt.",
+      };
+    }
     if (result === "invalid") {
       return { ok: false, message: "Bitte eine gültige Anzahl wählen." };
     }
