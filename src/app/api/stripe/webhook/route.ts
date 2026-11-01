@@ -15,6 +15,16 @@ export async function POST(request: Request) {
     );
     return new Response("Nicht eingerichtet", { status: 500 });
   }
+  if (
+    process.env.VERCEL_ENV === "production" &&
+    secret.startsWith("whsec_e2e")
+  ) {
+    // Das E2E-Secret steht im Repository; damit ließen sich Zahlungen fälschen.
+    console.error(
+      "STRIPE_WEBHOOK_SECRET ist das Test-Secret – Webhook gesperrt",
+    );
+    return new Response("Nicht eingerichtet", { status: 500 });
+  }
 
   const event = readCheckoutEvent(
     await request.text(),
@@ -31,7 +41,11 @@ export async function POST(request: Request) {
     notify: sendOrderNotice,
   });
   if (result === "unknown") {
-    console.warn(`Zahlung zu unbekannter Bestellung ${event.input.orderId}`);
+    // Bewusst keine automatische Erstattung: Entwicklung und Vorschau teilen sich das
+    // Stripe-Testkonto, jeder Endpunkt bekommt alle Events. Im Live-Modus prüfen!
+    console.error(
+      `Zahlung ${event.input.paymentIntentId} zu unbekannter Bestellung ${event.input.orderId} – bitte in Stripe prüfen`,
+    );
   }
   return Response.json({ received: true, result });
 }

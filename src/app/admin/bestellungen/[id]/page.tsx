@@ -10,10 +10,18 @@ import { db } from "@/lib/db";
 import { cancellationFor } from "@/lib/domain/payment";
 import { formatLongDate, formatPrice, formatTime } from "@/lib/format";
 import { PageHeader, PageSkeleton } from "../../_components/page-header";
+import { MAIL_FAILED, MAIL_SKIPPED } from "@/lib/mail/send";
 import { CancelOrder } from "../cancel-order";
 import { OrderStatusBadge } from "../order-status-badge";
+import { ResendMail } from "../resend-mail";
 
 export const metadata: Metadata = { title: "Bestellung" };
+
+const MAIL_LABELS: Record<string, string> = {
+  "order-confirmed": "Bestätigung",
+  "order-refunded": "Erstattung",
+  "order-cancelled": "Storno",
+};
 
 const dateTime = (date: Date) =>
   `${formatLongDate(date)}, ${formatTime(date)} Uhr`;
@@ -52,10 +60,23 @@ async function OrderDetail({
   });
   if (!order) notFound();
 
+  const mails = await db.emailLog.findMany({
+    where: {
+      dedupeKey: {
+        in: ["confirmed", "refunded", "cancelled"].map(
+          (kind) => `order-${kind}:${order.id}`,
+        ),
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { kind: true, providerId: true, createdAt: true },
+  });
+
   const now = new Date();
   const expired = order.status === "PENDING_PAYMENT" && order.expiresAt <= now;
   const plan = expired ? null : cancellationFor(order.status);
-  const canCancel = plan !== null && can(user.role, "orders:manage");
+  const canManage = can(user.role, "orders:manage");
+  const canCancel = plan !== null && canManage;
 
   const facts: [string, React.ReactNode][] = [
     ["Abholung", dateTime(order.pickupAt)],
@@ -169,6 +190,42 @@ async function OrderDetail({
               {order.customer.email}
             </a>
           </section>
+          {mails.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <h2 className="border-b border-line pb-2 text-2xl">Mails</h2>
+              <ul className="flex flex-col gap-2">
+                {mails.map((mail) => {
+                  const failed =
+                    mail.providerId === MAIL_FAILED ||
+                    mail.providerId === MAIL_SKIPPED;
+                  return (
+                    <li
+                      key={mail.kind}
+                      className="flex flex-wrap items-center gap-2"
+                    >
+                      <span>{MAIL_LABELS[mail.kind] ?? mail.kind}</span>
+                      <span
+                        className={
+                          failed ? "text-terracotta" : "text-ink-muted"
+                        }
+                      >
+                        {mail.providerId === MAIL_FAILED
+                          ? "fehlgeschlagen"
+                          : mail.providerId === MAIL_SKIPPED
+                            ? "nicht gesendet (kein Mail-Schlüssel)"
+                            : mail.providerId
+                              ? `gesendet ${formatTime(mail.createdAt)}`
+                              : "wird gesendet"}
+                      </span>
+                      {failed && canManage && (
+                        <ResendMail orderId={order.id} kind={mail.kind} />
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
           {order.refunds.length > 0 && (
             <section className="flex flex-col gap-2">
               <h2 className="border-b border-line pb-2 text-2xl">

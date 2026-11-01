@@ -45,6 +45,8 @@ export function readCheckoutEvent(
       sessionId: session.id,
       paymentIntentId:
         typeof intent === "string" ? intent : (intent?.id ?? null),
+      amountTotal: session.amount_total ?? null,
+      currency: session.currency ?? null,
     },
   };
 }

@@ -26,6 +26,9 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
     // Webhook-Tests signieren Events selbst; ohne echtes Secret gilt ein Test-Secret.
-    env: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+    env: {
+      STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
+      APP_URL: `http://localhost:${PORT}`,
+    },
   },
 });

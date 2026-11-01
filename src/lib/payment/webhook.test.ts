@@ -24,6 +24,8 @@ const session = (overrides: Record<string, unknown> = {}) => ({
       payment_intent: "pi_1",
       metadata: { orderId: "order1" },
       client_reference_id: "order1",
+      amount_total: 2100,
+      currency: "eur",
       ...overrides,
     },
   },
@@ -39,6 +41,8 @@ describe("readCheckoutEvent", () => {
         orderId: "order1",
         sessionId: "cs_1",
         paymentIntentId: "pi_1",
+        amountTotal: 2100,
+        currency: "eur",
       },
     });
   });

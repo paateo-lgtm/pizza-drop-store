@@ -11,6 +11,9 @@ export type SettleInput = {
   orderId: string;
   sessionId: string;
   paymentIntentId: string | null;
+  /** Tatsächlich gezahlter Betrag laut Stripe (Cent) und Währung */
+  amountTotal?: number | null;
+  currency?: string | null;
 };
 
 export type SettleResult =
@@ -74,6 +77,11 @@ async function settleInTransaction(
     },
   });
   const quantity = order.items.reduce((sum, i) => sum + i.quantity, 0);
+  // Erstattet wird immer, was wirklich gezahlt wurde.
+  const paidCents = input.amountTotal ?? order.totalCents;
+  const amountMismatch =
+    paidCents !== order.totalCents ||
+    (input.currency != null && input.currency !== "eur");
   const decision = decideCheckout({
     status: order.status,
     heldSlots: order.slots.length,
@@ -85,9 +93,12 @@ async function settleInTransaction(
       order.stripePaymentIntentId &&
       input.paymentIntentId !== order.stripePaymentIntentId;
     if (!second) return "duplicate";
+    console.warn(
+      `Zweite Zahlung zu Bestellung ${order.number} – wird erstattet`,
+    );
     const refund = await gateway.refund(
       input.paymentIntentId!,
-      order.totalCents,
+      paidCents,
       `dup:${input.paymentIntentId}`,
     );
     await tx.refund.upsert({
@@ -96,7 +107,7 @@ async function settleInTransaction(
       create: {
         orderId: order.id,
         stripeRefundId: refund.id,
-        amountCents: order.totalCents,
+        amountCents: paidCents,
         reason: "Doppelte Zahlung",
       },
     });
@@ -104,7 +115,12 @@ async function settleInTransaction(
   }
 
   const now = new Date();
-  if (decision === "accept") {
+  if (decision === "accept" && amountMismatch) {
+    console.error(
+      `Betrag passt nicht zu Bestellung ${order.number}: ${paidCents} ${input.currency} statt ${order.totalCents} eur – wird erstattet`,
+    );
+  }
+  if (decision === "accept" && !amountMismatch) {
     await tx.order.update({
       where: { id: order.id },
       data: {
@@ -132,7 +148,7 @@ async function settleInTransaction(
     return "accepted";
   }
 
-  // Erstatten: Slots sind weg oder die Bestellung wurde storniert.
+  // Erstatten: Slots sind weg, die Bestellung wurde storniert oder der Betrag passt nicht.
   if (!input.paymentIntentId) {
     throw new Error(
       `Zahlung zu ${order.id} ohne PaymentIntent – keine Erstattung möglich`,
@@ -140,7 +156,7 @@ async function settleInTransaction(
   }
   const refund = await gateway.refund(
     input.paymentIntentId,
-    order.totalCents,
+    paidCents,
     // Pro Zahlung ein Schlüssel: Auch eine weitere späte Zahlung wird erstattet.
     `late:${input.paymentIntentId}`,
   );
@@ -150,8 +166,10 @@ async function settleInTransaction(
     create: {
       orderId: order.id,
       stripeRefundId: refund.id,
-      amountCents: order.totalCents,
-      reason: "Zahlung nach Ablauf der Reservierung",
+      amountCents: paidCents,
+      reason: amountMismatch
+        ? "Gezahlter Betrag passt nicht zur Bestellung"
+        : "Zahlung nach Ablauf der Reservierung",
     },
   });
   await tx.kitchenTicket.deleteMany({ where: { orderId: order.id } });

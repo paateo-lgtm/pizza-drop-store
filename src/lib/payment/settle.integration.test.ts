@@ -220,6 +220,28 @@ describe("settleCheckout", () => {
     expect(mail.sent).toEqual([{ kind: "confirmed", orderId }]);
   });
 
+  it("erstattet statt anzunehmen, wenn Betrag oder Währung nicht passen", async () => {
+    const drop = await f.drop("betrag", 4, [pizza.id]);
+    const orderId = await reserved(drop.id, 12, 1, 1);
+    const { gateway, refunds } = fakeGateway();
+    expect(
+      await settleCheckout(
+        {
+          ...paid(orderId, "b1", "pi_betrag"),
+          amountTotal: 990,
+          currency: "eur",
+        },
+        { gateway, notify: notices().notify },
+      ),
+    ).toBe("refunded");
+    // Erstattet wird, was tatsächlich gezahlt wurde
+    expect(refunds).toEqual([
+      { paymentIntentId: "pi_betrag", amountCents: 990, key: "late:pi_betrag" },
+    ]);
+    expect(await db.kitchenTicket.count({ where: { orderId } })).toBe(0);
+    expect(await db.slot.count({ where: { orderId } })).toBe(0);
+  });
+
   it("lässt Stripe erneut zustellen, wenn die Erstattung scheitert", async () => {
     const drop = await f.drop("erstattung-fehler", 4, [pizza.id]);
     const orderId = await reserved(drop.id, 6, 1, 1);
@@ -265,7 +287,7 @@ describe("cancelOrder", () => {
       gateway,
       notify: mail.notify,
     });
-    expect(result).toEqual({ ok: true, status: "REFUNDED" });
+    expect(result).toMatchObject({ ok: true, status: "REFUNDED" });
     expect(refunds).toEqual([
       { paymentIntentId: "pi_c1", amountCents: 2100, key: `cancel:${orderId}` },
     ]);
@@ -289,7 +311,7 @@ describe("cancelOrder", () => {
     const { gateway, refunds } = fakeGateway();
     expect(
       await cancelOrder(orderId, null, { gateway, notify: notices().notify }),
-    ).toEqual({ ok: true, status: "CANCELLED" });
+    ).toMatchObject({ ok: true, status: "CANCELLED" });
     expect(refunds).toEqual([]);
     expect(await db.slot.count({ where: { orderId } })).toBe(0);
   });

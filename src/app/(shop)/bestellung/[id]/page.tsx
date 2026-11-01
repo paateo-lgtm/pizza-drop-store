@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { isOrderActive } from "@/lib/domain/booking";
 import type { OrderStatus } from "@/lib/domain/drops";
 import { formatLongDate, formatPrice, formatTime } from "@/lib/format";
+import { reconcileReturn } from "@/lib/payment/reconcile";
 import { isStripeConfigured } from "@/lib/payment/stripe";
 import { startPayment } from "./actions";
 import { PayForm } from "./pay-form";
@@ -88,6 +89,9 @@ async function OrderContent({
   // Ohne gültigen Schlüssel verhält sich die Seite, als gäbe es die Bestellung nicht.
   if (!key || !verifyOrderKey(id, key)) notFound();
 
+  // Zurück von Stripe: selbst nachfragen und eine bezahlte Session sofort verbuchen
+  const returned = query.bezahlt === "1" ? await reconcileReturn(id) : null;
+
   const order = await db.order.findUnique({
     where: { id },
     include: {
@@ -100,8 +104,8 @@ async function OrderContent({
 
   const now = new Date();
   const pending = order.status === "PENDING_PAYMENT";
-  // Zurück von Stripe, aber der Webhook ist noch nicht da
-  const confirming = pending && query.bezahlt === "1";
+  // Bezahlt, aber noch nicht bestätigt (Stripe nicht erreichbar oder verzögerte Zahlart)
+  const confirming = pending && returned === "pending";
   const reserved =
     pending && !confirming && isOrderActive(order.status, order.expiresAt, now);
   const expired = pending && !confirming && !reserved;
@@ -156,7 +160,17 @@ async function OrderContent({
             Das dauert meist nur ein paar Sekunden. Die Seite aktualisiert sich
             von selbst; die Bestätigung kommt außerdem per E-Mail.
           </p>
-          <AutoRefresh everyMs={2000} maxTimes={30} />
+          <AutoRefresh
+            everyMs={3000}
+            maxTimes={40}
+            fallback={
+              <p className="mt-6 rounded-md border border-line bg-surface p-4 text-sm">
+                Die Bestätigung dauert ungewöhnlich lange. Deine Zahlung ist
+                nicht verloren: Sobald sie bei uns ankommt, bekommst du eine
+                E-Mail. Du kannst diese Seite später neu laden.
+              </p>
+            }
+          />
         </>
       )}
 

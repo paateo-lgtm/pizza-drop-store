@@ -13,6 +13,10 @@ export function appUrl() {
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   }
+  if (process.env.NODE_ENV === "production") {
+    // Sonst landeten Links samt Schlüssel in Mails und bei Stripe auf localhost.
+    throw new Error("APP_URL bzw. VERCEL_PROJECT_PRODUCTION_URL fehlt");
+  }
   return "http://localhost:3000";
 }
 

@@ -1,11 +1,17 @@
 import "server-only";
+import Stripe from "stripe";
 import { db } from "@/lib/db";
 import { cancellationFor } from "@/lib/domain/payment";
 import type { PaymentGateway } from "./gateway";
 import { notifySafely, type Notify } from "./notify";
 
 export type CancelResult =
-  | { ok: true; status: "CANCELLED" | "REFUNDED" }
+  | {
+      ok: true;
+      status: "CANCELLED" | "REFUNDED";
+      /** Noch offenes Zahlfenster, das danach geschlossen werden sollte */
+      stripeSessionId: string | null;
+    }
   | { ok: false; message: string };
 
 class Rejection extends Error {}
@@ -22,9 +28,12 @@ export async function cancelOrder(
   reason: string | null,
   deps: { gateway: PaymentGateway; notify: Notify },
 ): Promise<CancelResult> {
-  let status: "CANCELLED" | "REFUNDED";
+  let done: {
+    status: "CANCELLED" | "REFUNDED";
+    stripeSessionId: string | null;
+  };
   try {
-    status = await db.$transaction(async (tx) => {
+    done = await db.$transaction(async (tx) => {
       const found = await tx.order.findUnique({
         where: { id: orderId },
         select: { dropId: true },
@@ -72,7 +81,7 @@ export async function cancelOrder(
         where: { id: orderId },
         data: { status: plan.status },
       });
-      return plan.status;
+      return { status: plan.status, stripeSessionId: order.stripeSessionId };
     }, TX_OPTIONS);
   } catch (error) {
     if (error instanceof Rejection)
@@ -81,10 +90,12 @@ export async function cancelOrder(
     return {
       ok: false,
       message:
-        "Die Erstattung ist fehlgeschlagen. Die Bestellung bleibt unverändert – bitte später erneut versuchen.",
+        error instanceof Stripe.errors.StripeError
+          ? `Stripe hat die Erstattung abgelehnt: ${error.message} Die Bestellung bleibt unverändert.`
+          : "Das Stornieren hat nicht geklappt. Die Bestellung bleibt unverändert – bitte gleich noch einmal versuchen.",
     };
   }
 
   await notifySafely(deps.notify, { kind: "cancelled", orderId });
-  return { ok: true, status };
+  return { ok: true, ...done };
 }
