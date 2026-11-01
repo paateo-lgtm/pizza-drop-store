@@ -89,18 +89,28 @@ async function OrderContent({
   // Ohne gültigen Schlüssel verhält sich die Seite, als gäbe es die Bestellung nicht.
   if (!key || !verifyOrderKey(id, key)) notFound();
 
-  // Zurück von Stripe: selbst nachfragen und eine bezahlte Session sofort verbuchen
-  const returned = query.bezahlt === "1" ? await reconcileReturn(id) : null;
-
-  const order = await db.order.findUnique({
-    where: { id },
-    include: {
-      items: true,
-      drop: { select: { title: true, slug: true, location: true } },
-      slots: { orderBy: { seq: "asc" }, select: { startsAt: true } },
-    },
-  });
+  const loadOrder = () =>
+    db.order.findUnique({
+      where: { id },
+      include: {
+        items: true,
+        drop: { select: { title: true, slug: true, location: true } },
+        slots: { orderBy: { seq: "asc" }, select: { startsAt: true } },
+      },
+    });
+  let order = await loadOrder();
   if (!order) notFound();
+
+  // Zurück von Stripe: selbst nachfragen und eine bezahlte Session sofort verbuchen.
+  // Nur solange die Zahlung offen ist; danach genügt die eine Abfrage oben.
+  const returned =
+    query.bezahlt === "1" && order.status === "PENDING_PAYMENT"
+      ? await reconcileReturn(order)
+      : null;
+  if (returned === "settled") {
+    order = await loadOrder();
+    if (!order) notFound();
+  }
 
   const now = new Date();
   const pending = order.status === "PENDING_PAYMENT";
@@ -160,9 +170,13 @@ async function OrderContent({
             Das dauert meist nur ein paar Sekunden. Die Seite aktualisiert sich
             von selbst; die Bestätigung kommt außerdem per E-Mail.
           </p>
+          {/* 3 s, dann wachsend bis 15 s (ca. 3 min): meist kommt der Webhook in Sekunden,
+              danach fragt jedes Neuladen sonst unnötig oft bei Stripe nach. */}
           <AutoRefresh
             everyMs={3000}
-            maxTimes={40}
+            growth={1.5}
+            maxEveryMs={15_000}
+            maxTimes={15}
             fallback={
               <p className="mt-6 rounded-md border border-line bg-surface p-4 text-sm">
                 Die Bestätigung dauert ungewöhnlich lange. Deine Zahlung ist

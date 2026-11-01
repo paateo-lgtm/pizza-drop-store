@@ -1,5 +1,4 @@
 import "server-only";
-import { db } from "@/lib/db";
 import { stripeGateway } from "./gateway";
 import { sendOrderNotice } from "./order-mails";
 import { settleCheckout } from "./settle";
@@ -11,16 +10,18 @@ export type ReturnState = "settled" | "pending" | "notPaid";
  * Rückkehr von Stripe: Statt nur auf den Webhook zu warten, fragt der Server selbst nach
  * und verbucht eine bezahlte Session sofort – mit derselben, idempotenten Logik wie der
  * Webhook. Der spätere Webhook ist dann ein Duplikat.
+ *
+ * Bekommt die schon geladene Bestellung, damit die Seite sie nicht doppelt liest.
  */
-export async function reconcileReturn(orderId: string): Promise<ReturnState> {
+export async function reconcileReturn(order: {
+  id: string;
+  status: string;
+  stripeSessionId: string | null;
+}): Promise<ReturnState> {
+  if (order.status !== "PENDING_PAYMENT") return "settled";
   if (!isStripeConfigured()) return "pending";
-  const order = await db.order.findUnique({
-    where: { id: orderId },
-    select: { status: true, stripeSessionId: true },
-  });
-  if (!order?.stripeSessionId || order.status !== "PENDING_PAYMENT") {
-    return order?.status === "PENDING_PAYMENT" ? "notPaid" : "settled";
-  }
+  if (!order.stripeSessionId) return "notPaid";
+  const orderId = order.id;
   try {
     const session = await getStripe().checkout.sessions.retrieve(
       order.stripeSessionId,
