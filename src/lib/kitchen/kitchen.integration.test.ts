@@ -137,6 +137,32 @@ describe("Kitchen-Mode", () => {
     ]);
   });
 
+  it("meldet klar, wenn die Bestellung inzwischen storniert wurde", async () => {
+    const drop = await f.drop("storniert", 6, [pizza.id]);
+    const { orderId, ticketIds } = await paidOrder(drop.id, 1, 1);
+    // Storno durch den Admin löscht die Tickets (siehe cancelOrder)
+    await db.kitchenTicket.deleteMany({ where: { orderId } });
+    await db.order.update({
+      where: { id: orderId },
+      data: { status: "REFUNDED" },
+    });
+
+    for (const result of [
+      await startTicket(ticketIds[0]),
+      await finishTicket(ticketIds[0]),
+      await pickUpOrder(orderId),
+    ]) {
+      expect(result).toEqual({
+        ok: false,
+        message: expect.stringMatching(/storniert/),
+      });
+    }
+    expect(await pickUpOrder("gibt-es-nicht")).toEqual({
+      ok: false,
+      message: expect.stringMatching(/gibt es nicht/),
+    });
+  });
+
   it("meldet, wenn kein freier Slot mehr kommt", async () => {
     const drop = await f.drop("voll", 1, [pizza.id]);
     await paidOrder(drop.id, 1, 1);
