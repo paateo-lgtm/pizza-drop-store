@@ -28,7 +28,8 @@ export type PrepPizza = {
 
 /**
  * Wie viele Pizzen je Sorte bei Ausverkauf? Die freie Kapazität wird nach dem Verkauf
- * früherer Drops verteilt, ohne Historie nach dem aktuellen Verkauf, sonst gleichmäßig.
+ * früherer Drops verteilt (neue Sorten ohne Historie zählen wie eine durchschnittliche),
+ * ohne jede Historie nach dem aktuellen Verkauf, sonst gleichmäßig.
  * Kontingente deckeln; ihr Überschuss geht an die übrigen Sorten. Rest nach Reihenfolge.
  */
 export function projectSellOut(
@@ -37,8 +38,16 @@ export function projectSellOut(
 ): Map<string, number> {
   const totalSold = menu.reduce((sum, p) => sum + p.sold, 0);
   const totalPast = menu.reduce((sum, p) => sum + p.pastSold, 0);
-  const weightOf = (p: PrepPizza) =>
-    totalPast > 0 ? p.pastSold : totalSold > 0 ? p.sold : 1;
+  const withHistory = menu.filter((p) => p.pastSold > 0).length;
+  const weightOf = (p: PrepPizza) => {
+    if (totalPast > 0) {
+      // Anteile: neue Sorten je 1/n, die übrigen teilen den Rest nach ihrer Historie.
+      return p.pastSold > 0
+        ? (p.pastSold / totalPast) * (withHistory / menu.length)
+        : 1 / menu.length;
+    }
+    return totalSold > 0 ? p.sold : 1;
+  };
 
   const added = menu.map(() => 0);
   const headroom = menu.map((p) =>
