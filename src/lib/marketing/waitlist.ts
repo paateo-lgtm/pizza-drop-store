@@ -70,6 +70,7 @@ export async function leaveWaitlist(
  * Benachrichtigt Wartende, sobald für ihre Anzahl Slots am Stück frei sind. Jeder
  * Versuch zählt zum `limit`; nach `deadline` (ms seit Epoche) bricht der Lauf ab.
  * Übersprungene und gescheiterte Mails versucht der nächste Lauf erneut.
+ * Einträge vergangener oder abgesagter Drops löscht der Lauf vorab (Datensparsamkeit).
  */
 export async function sendDueWaitlistNotices(
   now: Date,
@@ -79,6 +80,12 @@ export async function sendDueWaitlistNotices(
     deadline?: number;
   },
 ): Promise<AlertRun> {
+  await db.waitlistEntry.deleteMany({
+    where: {
+      drop: { OR: [{ bakeEndsAt: { lt: now } }, { status: "CANCELLED" }] },
+    },
+  });
+
   const open = { notifiedAt: null, convertedOrderId: null };
   const drops = await db.drop.findMany({
     where: {
