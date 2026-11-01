@@ -13,7 +13,13 @@ export type SettleInput = {
   paymentIntentId: string | null;
 };
 
-export type SettleResult = "accepted" | "refunded" | "duplicate" | "unknown";
+export type SettleResult =
+  | "accepted"
+  | "refunded"
+  | "duplicate"
+  /** Bestellung war schon bezahlt; eine zweite Zahlung (z. B. zweites Zahlfenster) wird erstattet */
+  | "duplicatePaymentRefunded"
+  | "unknown";
 
 // Eine Erstattung läuft innerhalb der Transaktion: Scheitert sie, rollt alles zurück –
 // auch der Eintrag des Events – und Stripe stellt das Event erneut zu.
@@ -73,7 +79,29 @@ async function settleInTransaction(
     heldSlots: order.slots.length,
     quantity,
   });
-  if (decision === "duplicate") return "duplicate";
+  if (decision === "duplicate") {
+    const second =
+      input.paymentIntentId &&
+      order.stripePaymentIntentId &&
+      input.paymentIntentId !== order.stripePaymentIntentId;
+    if (!second) return "duplicate";
+    const refund = await gateway.refund(
+      input.paymentIntentId!,
+      order.totalCents,
+      `dup:${input.paymentIntentId}`,
+    );
+    await tx.refund.upsert({
+      where: { stripeRefundId: refund.id },
+      update: {},
+      create: {
+        orderId: order.id,
+        stripeRefundId: refund.id,
+        amountCents: order.totalCents,
+        reason: "Doppelte Zahlung",
+      },
+    });
+    return "duplicatePaymentRefunded";
+  }
 
   const now = new Date();
   if (decision === "accept") {
@@ -113,7 +141,8 @@ async function settleInTransaction(
   const refund = await gateway.refund(
     input.paymentIntentId,
     order.totalCents,
-    `late:${order.id}`,
+    // Pro Zahlung ein Schlüssel: Auch eine weitere späte Zahlung wird erstattet.
+    `late:${input.paymentIntentId}`,
   );
   await tx.refund.upsert({
     where: { stripeRefundId: refund.id },
@@ -134,8 +163,10 @@ async function settleInTransaction(
     where: { id: order.id },
     data: {
       status: "REFUNDED",
-      stripeSessionId: input.sessionId,
-      stripePaymentIntentId: input.paymentIntentId,
+      // Eine frühere Zahlung bleibt vermerkt; sonst die erstattete
+      stripeSessionId: order.stripeSessionId ?? input.sessionId,
+      stripePaymentIntentId:
+        order.stripePaymentIntentId ?? input.paymentIntentId,
     },
   });
   return "refunded";

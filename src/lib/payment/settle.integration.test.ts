@@ -119,9 +119,9 @@ describe("settleCheckout", () => {
     );
     expect(results.filter((r) => r === "accepted")).toHaveLength(1);
     expect(results.filter((r) => r === "duplicate")).toHaveLength(4);
-    // Ein zweites Event (z. B. async_payment_succeeded) ändert auch nichts mehr
+    // Ein zweites Event zur selben Zahlung (z. B. async_payment_succeeded) ändert nichts
     expect(
-      await settleCheckout(paid(orderId, "d2"), {
+      await settleCheckout(paid(orderId, "d2", "pi_d1"), {
         gateway,
         notify: mail.notify,
       }),
@@ -156,7 +156,7 @@ describe("settleCheckout", () => {
       {
         paymentIntentId: "pi_late",
         amountCents: 2100,
-        key: `late:${late.orderId}`,
+        key: "late:pi_late",
       },
     ]);
     const order = await db.order.findUniqueOrThrow({
@@ -192,6 +192,32 @@ describe("settleCheckout", () => {
         notify: notices().notify,
       }),
     ).toBe("accepted");
+  });
+
+  it("erstattet eine zweite Zahlung derselben Bestellung (zwei offene Zahlfenster)", async () => {
+    const drop = await f.drop("zweimal", 4, [pizza.id]);
+    const orderId = await reserved(drop.id, 11, 1, 1);
+    const { gateway, refunds } = fakeGateway();
+    const mail = notices();
+    await settleCheckout(paid(orderId, "z1", "pi_erste"), {
+      gateway,
+      notify: mail.notify,
+    });
+    expect(
+      await settleCheckout(paid(orderId, "z2", "pi_zweite"), {
+        gateway,
+        notify: mail.notify,
+      }),
+    ).toBe("duplicatePaymentRefunded");
+    expect(refunds).toEqual([
+      { paymentIntentId: "pi_zweite", amountCents: 1050, key: "dup:pi_zweite" },
+    ]);
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order).toMatchObject({
+      status: "PAID",
+      stripePaymentIntentId: "pi_erste",
+    });
+    expect(mail.sent).toEqual([{ kind: "confirmed", orderId }]);
   });
 
   it("lässt Stripe erneut zustellen, wenn die Erstattung scheitert", async () => {
