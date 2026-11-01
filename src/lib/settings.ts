@@ -11,6 +11,8 @@ export const settingsSchema = z.object({
   defaultMaxPizzasPerOrder: z.number().int().min(1).max(20),
   reservationMinutes: z.number().int().min(5).max(30),
   vatRatePercent: z.number().min(0).max(25),
+  /** Aufschlag in der Vorbereitungsliste („mit Puffer“) */
+  prepBufferPercent: z.number().int().min(0).max(100),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -23,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultMaxPizzasPerOrder: 4,
   reservationMinutes: 10,
   vatRatePercent: 7,
+  prepBufferPercent: 10,
 };
 
 /** Gespeicherte Werte über die Standardwerte legen; ungültige Einträge werden ignoriert. */

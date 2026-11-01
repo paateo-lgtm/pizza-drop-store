@@ -164,6 +164,29 @@ export function SettingsForm({ settings }: { settings: Settings }) {
         </Field>
       </Group>
 
+      <Group title="Küche">
+        <Field
+          id="prepBufferPercent"
+          label="Puffer in der Vorbereitungsliste"
+          hint="Aufschlag auf die Mengen bei Ausverkauf, z. B. für Ausschuss beim Teig."
+          error={errors.prepBufferPercent}
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              id="prepBufferPercent"
+              name="prepBufferPercent"
+              type="number"
+              step="1"
+              min={0}
+              max={100}
+              defaultValue={settings.prepBufferPercent}
+              className="w-24 tabular-nums"
+            />
+            <span className="text-sm text-ink-muted">%</span>
+          </div>
+        </Field>
+      </Group>
+
       <div className="flex items-center gap-4">
         <Button type="submit" size="lg" disabled={pending}>
           {pending ? "Speichern …" : "Speichern"}

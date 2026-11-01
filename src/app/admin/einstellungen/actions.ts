@@ -19,6 +19,7 @@ const formSchema = z
     defaultMaxPizzasPerOrder: int,
     reservationMinutes: int,
     vatRatePercent: z.coerce.number(),
+    prepBufferPercent: int,
   })
   .transform(({ slotMinutes, slotSecondsPart, ...rest }) => ({
     ...rest,
