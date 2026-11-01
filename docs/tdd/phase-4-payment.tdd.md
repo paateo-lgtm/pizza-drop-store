@@ -73,4 +73,6 @@
   - `stripe listen` leitet `checkout.session.completed` weiter, der Webhook antwortet 200.
   - Bestellung `PAID` mit Payment-Intent, 2 Küchen-Tickets, Statusseite mit Abholcode und QR-Code.
   - Admin-Storno: Bestellung `REFUNDED`, Tickets gelöscht, Erstattung über 21,00 € in Stripe `succeeded`.
-  - Mails nur protokolliert („nicht-gesendet“), weil `RESEND_API_KEY` fehlt. Der echte Mailversand ist noch nicht geprüft.
+  - Mails nur protokolliert („nicht-gesendet“), weil `RESEND_API_KEY` fehlt.
+- **Mailversand:** Mit Schlüssel scheiterte jede Mail, weil Resend `@react-email/render` nicht fand (nur verschachtelt installiert). RED `411e65a`, GREEN `d0a5588` (direkte Abhängigkeit, Test `src/emails/order-mail.test.tsx`).
+- **Live-Test in Produktion am 2026-11-01:** Bestellung über pizza-drop-store.vercel.app mit Stripe-Sandbox bezahlt (`PAID`, 1 Küchen-Ticket). Bestätigungs- und Storno-Mail von Resend angenommen und zugestellt. Admin-Storno: `REFUNDED`, Tickets gelöscht, Erstattung über 14,50 € `succeeded`, Drop wieder 30 von 30 frei.
