@@ -2,7 +2,7 @@ import Stripe from "stripe";
 
 /** Gleiches Secret für den Testserver (playwright.config.ts) und die signierten Test-Events. */
 export const WEBHOOK_SECRET =
-  process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_nur_fuer_tests";
+  process.env.STRIPE_WEBHOOK_SECRET || "whsec_e2e_nur_fuer_tests";
 
 const signer = new Stripe("sk_test_nur_signatur").webhooks;
 
