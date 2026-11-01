@@ -43,7 +43,7 @@ const oven = (page: Page) =>
   page.getByRole("region", { name: "Jetzt im Ofen" });
 const nextUp = (page: Page) =>
   page.getByRole("region", { name: "Als Nächstes · belegen" });
-const ready = (page: Page) => page.getByRole("region", { name: "Abholbereit" });
+const ready = (page: Page) => page.getByRole("region", { name: "Ausgabe" });
 
 test.describe("Kitchen-Mode", () => {
   let drop: TestDrop;
@@ -168,6 +168,69 @@ test.describe("Kitchen-Mode", () => {
       ).toBeVisible();
       await device.page.getByRole("button", { name: "Anmelden" }).click();
       await expect(device.page).toHaveURL(/\/login\?next=/);
+    } finally {
+      await device.close();
+    }
+  });
+
+  test("Ausgabe findet per Name und QR-Scan und gibt nur Fertiges aus", async ({
+    browser,
+    page,
+    baseURL,
+  }) => {
+    test.setTimeout(90_000);
+    const { orderId } = await reserve(page, drop, 1);
+    await sendPaidEvent(baseURL!, {
+      eventId: `evt_${drop.tag}_1`,
+      orderId,
+      paymentIntentId: `pi_${drop.tag}`,
+    });
+    const [{ pickupCode }] = await drop.orders();
+
+    const device = await kitchenDevice(browser, drop.dropId);
+    // Kamera und BarcodeDetector nachbilden: Der „Scan“ liefert den Abholcode.
+    await device.context.addInitScript((code) => {
+      Object.defineProperty(window, "BarcodeDetector", {
+        value: class {
+          async detect() {
+            return [{ rawValue: code }];
+          }
+        },
+      });
+      navigator.mediaDevices.getUserMedia = async () =>
+        document.createElement("canvas").captureStream();
+    }, pickupCode);
+    await device.page.reload();
+    const desk = ready(device.page);
+    try {
+      // Noch nicht gebacken: gefunden, aber nicht ausgeben
+      await desk.getByRole("searchbox").fill("rossi");
+      const result = desk.getByRole("list", { name: "Suchergebnis" });
+      await expect(result.getByText("Wartet auf den Ofen")).toBeVisible();
+      await expect(
+        result.getByRole("button", { name: /Abgeholt/ }),
+      ).toHaveCount(0);
+      await desk.getByRole("searchbox").fill("");
+
+      await nextUp(device.page)
+        .getByRole("button", { name: "In den Ofen" })
+        .click();
+      await oven(device.page).getByRole("button", { name: "Fertig" }).click();
+      await expect(
+        oven(device.page).getByText("Alles gebacken. Feierabend in Sicht!"),
+      ).toBeVisible();
+
+      // QR-Scan füllt die Suche mit dem Abholcode
+      await desk.getByRole("button", { name: "QR scannen" }).click();
+      await expect(desk.getByRole("searchbox")).toHaveValue(pickupCode);
+      await expect(
+        device.page.getByRole("dialog", { name: "QR-Code scannen" }),
+      ).toBeHidden();
+      await result.getByRole("button", { name: /Abgeholt/ }).click();
+      await expect(desk.getByText(/^Abgeholt: #\d+$/)).toBeVisible();
+
+      const [order] = await drop.orders();
+      expect(order.status).toBe("PICKED_UP");
     } finally {
       await device.close();
     }

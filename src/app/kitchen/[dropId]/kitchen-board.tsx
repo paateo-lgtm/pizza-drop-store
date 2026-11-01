@@ -16,6 +16,7 @@ import { SlotBand, type SlotBandState } from "@/components/slot-band";
 import { Button } from "@/components/ui/button";
 import { formatDuration, formatTime } from "@/lib/format";
 import type { KitchenBoard } from "@/lib/kitchen/kitchen";
+import { PickupDesk } from "./pickup-desk";
 import { cn } from "@/lib/utils";
 import {
   blockNextSlotAction,
@@ -323,12 +324,20 @@ export function KitchenBoardView({ board }: { board: KitchenBoard }) {
         </section>
 
         <section
-          aria-labelledby="abholbereit"
+          aria-labelledby="ausgabe"
           className="flex flex-col bg-background p-6"
         >
-          <h2 id="abholbereit" className={cn(sectionTitle, "text-olive")}>
-            Abholbereit
+          <h2 id="ausgabe" className={cn(sectionTitle, "text-olive")}>
+            Ausgabe
           </h2>
+          <div className="mt-4">
+            <PickupDesk
+              orders={board.orders}
+              pending={pending}
+              onPickUp={(orderId) => run(() => pickUpAction(orderId))}
+            />
+          </div>
+          <h3 className={cn(sectionTitle, "mt-8 text-olive")}>Abholbereit</h3>
           {ready.length === 0 ? (
             <p className="mt-4 text-lg text-ink-muted">
               Noch nichts abholbereit.

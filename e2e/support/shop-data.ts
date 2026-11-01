@@ -97,9 +97,10 @@ export async function createBookableDrop(key: string, slotCount = 12) {
       const { rows } = await pool.query<{
         status: string;
         totalCents: number;
+        pickupCode: string;
         seqs: number[];
       }>(
-        `SELECT o.status, o."totalCents",
+        `SELECT o.status, o."totalCents", o."pickupCode",
            array_agg(s.seq ORDER BY s.seq) FILTER (WHERE s.seq IS NOT NULL) AS seqs
          FROM "Order" o LEFT JOIN "Slot" s ON s."orderId" = o.id
          WHERE o."dropId" = $1 GROUP BY o.id`,
