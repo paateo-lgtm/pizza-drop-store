@@ -74,6 +74,32 @@ describe("findPickupOrders", () => {
     );
     expect(findPickupOrders(many, "gast")).toHaveLength(6);
   });
+
+  it("findet auch Abholcodes, die nur aus Ziffern bestehen", () => {
+    const withDigitCode = [
+      order(234, "Paolo Neri", "999999", "READY", 6),
+      order(567, "Gina Blu", "234567", "READY", 12),
+    ];
+    expect(
+      findPickupOrders(withDigitCode, "234567").map((o) => o.number),
+    ).toEqual([567]);
+    expect(findPickupOrders(withDigitCode, "234").map((o) => o.number)).toEqual(
+      [234],
+    );
+  });
+
+  it("zeigt stornierte Bestellungen, damit sie nicht ausgegeben werden – ganz hinten", () => {
+    const withCancelled = [
+      order(701, "Rosa Rossi", "CCCCCC", "REFUNDED", 0),
+      order(702, "Rosa Rossi", "DDDDDD", "READY", 30),
+    ];
+    expect(
+      findPickupOrders(withCancelled, "rosa").map((o) => o.number),
+    ).toEqual([702, 701]);
+    expect(
+      findPickupOrders(withCancelled, "cccccc").map((o) => o.status),
+    ).toEqual(["REFUNDED"]);
+  });
 });
 
 describe("parseScannedCode", () => {
