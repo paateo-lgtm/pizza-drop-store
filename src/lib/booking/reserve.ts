@@ -200,6 +200,12 @@ async function reserveInTransaction(
     select: { id: true },
   });
 
+  // Wer selbst bucht, braucht von der Warteliste keine Nachricht mehr.
+  await tx.waitlistEntry.updateMany({
+    where: { dropId: drop.id, email: input.email, convertedOrderId: null },
+    data: { convertedOrderId: order.id },
+  });
+
   // Dieselbe Regel wie slotStatus(): frei, wenn ohne Bestellung oder die Bestellung den
   // Slot nicht (mehr) hält. Zweite Absicherung neben der Zeilensperre.
   const { count } = await tx.slot.updateMany({

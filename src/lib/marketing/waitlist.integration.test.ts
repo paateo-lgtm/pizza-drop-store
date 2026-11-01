@@ -18,8 +18,9 @@ function notices(result: "sent" | "skipped" = "sent") {
   const sent: WaitlistNotice[] = [];
   return {
     sent,
-    /** Nur die Benachrichtigungen dieses Testlaufs */
-    mine: () => sent.filter((m) => m.to.startsWith(RUN)).map((m) => m.to),
+    /** Nur die Benachrichtigungen für diesen Drop (andere Tests laufen in derselben DB) */
+    mine: (drop: { slug: string }) =>
+      sent.filter((m) => m.dropSlug === drop.slug).map((m) => m.to),
     sendNotice: async (mail: WaitlistNotice) => {
       sent.push(mail);
       return result;
@@ -139,7 +140,7 @@ describe("sendDueWaitlistNotices", () => {
       sendNotice: full.sendNotice,
       limit: 100,
     });
-    expect(full.mine()).toEqual([]);
+    expect(full.mine(drop)).toEqual([]);
 
     // Storno gibt die Slots 1–2 frei: „drei“ passt nicht, „zwei“ schon
     await db.order.update({
@@ -152,7 +153,7 @@ describe("sendDueWaitlistNotices", () => {
       sendNotice: freed.sendNotice,
       limit: 100,
     });
-    expect(freed.mine()).toEqual([email("zwei")]);
+    expect(freed.mine(drop)).toEqual([email("zwei")]);
     expect(freed.sent.find((m) => m.to === email("zwei"))).toMatchObject({
       quantity: 2,
       dropSlug: drop.slug,
@@ -167,7 +168,7 @@ describe("sendDueWaitlistNotices", () => {
       sendNotice: soon.sendNotice,
       limit: 100,
     });
-    expect(soon.mine()).toEqual([]);
+    expect(soon.mine(drop)).toEqual([]);
 
     // Danach kommt der Nächste an die Reihe, für den eine Folge frei ist
     const later = notices();
@@ -175,7 +176,7 @@ describe("sendDueWaitlistNotices", () => {
       new Date(now.getTime() + (NOTICE_HEAD_START_MINUTES + 1) * 60_000),
       { sendNotice: later.sendNotice, limit: 100 },
     );
-    expect(later.mine()).toEqual([email("eins")]);
+    expect(later.mine(drop)).toEqual([email("eins")]);
   });
 
   it("überspringt Einträge, die inzwischen selbst gebucht haben", async () => {
@@ -199,7 +200,7 @@ describe("sendDueWaitlistNotices", () => {
       sendNotice: n.sendNotice,
       limit: 100,
     });
-    expect(n.mine()).toEqual([]);
+    expect(n.mine(drop)).toEqual([]);
   });
 
   it("vermerkt übersprungene Mails nicht als benachrichtigt", async () => {
@@ -211,7 +212,7 @@ describe("sendDueWaitlistNotices", () => {
       sendNotice: n.sendNotice,
       limit: 100,
     });
-    expect(n.mine()).toEqual([email("skip")]);
+    expect(n.mine(drop)).toEqual([email("skip")]);
     expect(run.skipped).toBeGreaterThanOrEqual(1);
     expect((await entryOf(drop.id, "skip"))!.notifiedAt).toBeNull();
   });
@@ -232,7 +233,7 @@ describe("sendDueWaitlistNotices", () => {
       sendNotice: n.sendNotice,
       limit: 100,
     });
-    expect(n.mine()).toEqual([]);
+    expect(n.mine(drop)).toEqual([]);
   });
 
   it("verschickt pro Lauf höchstens das Limit", async () => {

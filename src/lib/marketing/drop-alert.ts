@@ -39,7 +39,7 @@ export const CONSENT_VERSION = "einwilligung-2026-11-01";
 export const CONFIRM_MAIL_KIND = "drop-alarm-bestaetigen";
 
 /** 32 Byte Zufall: nicht zu erraten, auch nicht über viele Versuche. */
-const newToken = () => randomBytes(32).toString("base64url");
+export const newToken = () => randomBytes(32).toString("base64url");
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
