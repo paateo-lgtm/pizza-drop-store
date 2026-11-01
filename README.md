@@ -25,8 +25,8 @@ Die lokale Entwicklung nutzt den Neon-Zweig `dev` (Projekt „Pizza Drop Store�
 Adressen holen: `neon connection-string dev --pooled` (→ `DATABASE_URL`) und
 `neon connection-string dev` (→ `DIRECT_URL`).
 
-- Landingpage (Entwurf): http://localhost:3000
-- Kitchen-Mode (Entwurf): http://localhost:3000/entwurf/kueche
+- Landingpage: http://localhost:3000
+- Kitchen-Mode: http://localhost:3000/kitchen (nach dem Login als Küche oder Admin)
 - Team-Login: http://localhost:3000/login mit `admin@pizzadrop.test` oder `kueche@pizzadrop.test` und dem `SEED_PASSWORD` aus `.env`
 
 Ohne Neon geht es auch mit `npm run db:start` (prisma dev). Diese Datenbank erlaubt aber nur

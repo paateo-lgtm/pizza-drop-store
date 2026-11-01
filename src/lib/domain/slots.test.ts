@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findConsecutiveStarts, generateSlots } from "./slots";
+import { generateSlots } from "./slots";
 
 const at = (iso: string) => new Date(iso);
 
@@ -49,28 +49,5 @@ describe("generateSlots", () => {
     expect(() => generateSlots(start, start, 360)).toThrow(RangeError);
     expect(() => generateSlots(start, end, 0)).toThrow(RangeError);
     expect(() => generateSlots(start, end, 5.5)).toThrow(RangeError);
-  });
-});
-
-describe("findConsecutiveStarts", () => {
-  const F = true;
-  const X = false;
-
-  it("liefert für eine Pizza jeden freien Slot", () => {
-    expect(findConsecutiveStarts([F, X, F, F], 1)).toEqual([0, 2, 3]);
-  });
-
-  it("liefert nur Starts mit genug freien Slots am Stück", () => {
-    expect(findConsecutiveStarts([F, F, X, F, F, F], 2)).toEqual([0, 3, 4]);
-    expect(findConsecutiveStarts([F, F, X, F, F, F], 3)).toEqual([3]);
-  });
-
-  it("liefert nichts, wenn keine Folge lang genug ist", () => {
-    expect(findConsecutiveStarts([F, X, F, X], 2)).toEqual([]);
-    expect(findConsecutiveStarts([], 1)).toEqual([]);
-  });
-
-  it("lehnt eine Menge unter 1 ab", () => {
-    expect(() => findConsecutiveStarts([F], 0)).toThrow(RangeError);
   });
 });

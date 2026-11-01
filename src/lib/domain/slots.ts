@@ -33,25 +33,3 @@ export function generateSlots(
     endsAt: new Date(start + (i + 1) * slotMs),
   }));
 }
-
-/**
- * Startpositionen (0-basiert), ab denen `quantity` Slots am Stück frei sind.
- * Eine Bestellung über n Pizzen belegt genau diese n Slots; abgeholt wird am Ende des letzten.
- */
-export function findConsecutiveStarts(
-  isFree: readonly boolean[],
-  quantity: number,
-): number[] {
-  if (!Number.isInteger(quantity) || quantity < 1) {
-    throw new RangeError("quantity muss mindestens 1 sein");
-  }
-  const starts: number[] = [];
-  let run = 0;
-  for (let i = 0; i < isFree.length; i++) {
-    run = isFree[i] ? run + 1 : 0;
-    if (run >= quantity) {
-      starts.push(i - quantity + 1);
-    }
-  }
-  return starts;
-}

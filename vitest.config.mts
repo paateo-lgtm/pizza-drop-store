@@ -4,7 +4,7 @@ export default defineConfig({
   resolve: { tsconfigPaths: true },
   oxc: { jsx: { runtime: "automatic" } },
   test: {
-    // Fachlogik läuft in Node; Komponententests setzen per Kommentar `@vitest-environment jsdom`.
+    // Fachlogik läuft in Node; Oberflächen prüfen die E2E-Tests (Playwright).
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}"],
     // Datenbanktests: npm run test:integration
