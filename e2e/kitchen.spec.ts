@@ -36,7 +36,7 @@ async function kitchenDevice(browser: Browser, dropId: string) {
   await page.getByLabel("Passwort").fill(password);
   await page.getByRole("button", { name: "Anmelden" }).click();
   await expect(page.getByText(/^Küche · Testdrop/)).toBeVisible();
-  return { page, close: () => context.close() };
+  return { page, context, close: () => context.close() };
 }
 
 const oven = (page: Page) =>
@@ -132,6 +132,44 @@ test.describe("Kitchen-Mode", () => {
     } finally {
       await a.close();
       await b.close();
+    }
+  });
+
+  test("warnt bei Verbindungsabbruch und abgelaufener Sitzung", async ({
+    browser,
+    page,
+    baseURL,
+  }) => {
+    test.setTimeout(90_000);
+    const { orderId } = await reserve(page, drop, 1);
+    await sendPaidEvent(baseURL!, {
+      eventId: `evt_${drop.tag}_1`,
+      orderId,
+      paymentIntentId: `pi_${drop.tag}`,
+    });
+    const device = await kitchenDevice(browser, drop.dropId);
+    try {
+      // Offline: Das Board darf nicht live wirken
+      await device.context.setOffline(true);
+      const alert = device.page.getByRole("alert").filter({
+        hasText: "Verbindung unterbrochen",
+      });
+      await expect(alert).toBeVisible({ timeout: 20_000 });
+      await device.context.setOffline(false);
+      await expect(alert).toBeHidden({ timeout: 10_000 });
+
+      // Sitzung weg: klare Meldung mit Weg zur Anmeldung statt „Keine Verbindung“
+      await device.context.clearCookies();
+      await nextUp(device.page)
+        .getByRole("button", { name: "In den Ofen" })
+        .click();
+      await expect(
+        device.page.getByText("Sitzung abgelaufen – bitte neu anmelden."),
+      ).toBeVisible();
+      await device.page.getByRole("button", { name: "Anmelden" }).click();
+      await expect(device.page).toHaveURL(/\/login\?next=/);
+    } finally {
+      await device.close();
     }
   });
 });

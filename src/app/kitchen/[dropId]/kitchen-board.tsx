@@ -9,19 +9,20 @@ import {
   Timer,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { SlotBand, type SlotBandState } from "@/components/slot-band";
 import { Button } from "@/components/ui/button";
 import { formatDuration, formatTime } from "@/lib/format";
 import type { KitchenBoard } from "@/lib/kitchen/kitchen";
-import type { KitchenResult } from "@/lib/kitchen/kitchen";
 import { cn } from "@/lib/utils";
 import {
   blockNextSlotAction,
   finishTicketAction,
   pickUpAction,
   startTicketAction,
+  type KitchenActionResult,
 } from "../actions";
 
 const clock = new Intl.DateTimeFormat("de-DE", {
@@ -31,36 +32,84 @@ const clock = new Intl.DateTimeFormat("de-DE", {
   timeZone: "Europe/Berlin",
 });
 
+/** Ab diesem Alter gelten die Daten als veraltet (Polling alle 3 s). */
+const STALE_MS = 10_000;
+/** Größere Abweichungen sind eine umgestellte Uhr, keine Netzlaufzeit. */
+const CLOCK_JUMP_MS = 2000;
+
 /**
  * Uhr im Takt der Serverzeit: Alle Geräte zeigen dieselbe Zeit, auch wenn ihre
- * eigene Uhr falsch geht. Der Abstand wird bei jedem Polling neu bestimmt.
+ * eigene Uhr falsch geht. Die Netzlaufzeit macht den gemessenen Abstand nur kleiner,
+ * deshalb gilt der größte bisher gemessene – so springt die Uhr beim Polling nicht.
+ * `ageMs`: wie alt die angezeigten Daten sind.
  */
-function useServerNow(serverNow: Date) {
-  const [now, setNow] = useState(serverNow);
+function useServerClock(serverNow: Date) {
+  const offsetRef = useRef<number | null>(null);
+  const [clockState, setClockState] = useState({ now: serverNow, ageMs: 0 });
   useEffect(() => {
-    const offset = serverNow.getTime() - Date.now();
-    const tick = () => setNow(new Date(Date.now() + offset));
+    const receivedAt = Date.now();
+    const measured = serverNow.getTime() - receivedAt;
+    const previous = offsetRef.current;
+    const offset =
+      previous === null || Math.abs(measured - previous) > CLOCK_JUMP_MS
+        ? measured
+        : Math.max(previous, measured);
+    offsetRef.current = offset;
+    const tick = () => {
+      const t = Date.now();
+      setClockState({ now: new Date(t + offset), ageMs: t - receivedAt });
+    };
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, [serverNow]);
-  return now;
+  return clockState;
 }
 
 /** Führt eine Küchenaktion aus und meldet Ablehnungen sichtbar. */
 function useKitchenAction() {
   const [pending, startTransition] = useTransition();
-  function run(action: () => Promise<KitchenResult>) {
+  const router = useRouter();
+  const pathname = usePathname();
+  function run(action: () => Promise<KitchenActionResult>) {
     startTransition(async () => {
       try {
         const result = await action();
-        if (!result.ok) toast.error(result.message);
-      } catch {
+        if (result.ok) return;
+        if ("signIn" in result) {
+          toast.error(result.message, {
+            duration: Infinity,
+            action: {
+              label: "Anmelden",
+              onClick: () =>
+                router.push(`/login?next=${encodeURIComponent(pathname)}`),
+            },
+          });
+        } else {
+          toast.error(result.message);
+        }
+      } catch (error) {
+        console.error("Küchenaktion fehlgeschlagen", error);
         toast.error("Keine Verbindung – bitte gleich noch einmal tippen.");
       }
     });
   }
   return { pending, run };
+}
+
+/** Warnt, wenn das Polling nicht mehr ankommt: Ein altes Board darf nicht live wirken. */
+function StaleNotice({ serverNow }: { serverNow: Date }) {
+  const { ageMs } = useServerClock(serverNow);
+  if (ageMs < STALE_MS) return null;
+  return (
+    <p
+      role="alert"
+      className="bg-terracotta px-6 py-3 text-lg font-semibold text-white"
+    >
+      Verbindung unterbrochen – Stand {clock.format(serverNow)}. Die Anzeige ist
+      nicht aktuell.
+    </p>
+  );
 }
 
 function bandState(slot: KitchenBoard["slots"][number]): SlotBandState {
@@ -80,27 +129,28 @@ export function KitchenBoardView({ board }: { board: KitchenBoard }) {
 
   return (
     <div className="flex flex-1 flex-col">
+      <StaleNotice serverNow={board.serverNow} />
       <header className="flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-line px-6 py-4">
         <div className="flex items-center gap-4">
           <Link
             href="/kitchen"
             aria-label="Zur Drop-Auswahl"
-            className="rounded-md p-2 text-ink-muted hover:text-foreground"
+            className="rounded-md p-3 text-ink-muted hover:text-foreground"
           >
             <ArrowLeft className="size-6" aria-hidden />
           </Link>
           <div>
-            <p className="text-xs tracking-wide text-ink-muted uppercase">
+            <h1 className="font-sans text-xs tracking-wide text-ink-muted uppercase">
               Küche · {drop.title}
-            </p>
+            </h1>
             <p className="text-4xl font-semibold tabular-nums">
               <span className="sr-only">Uhrzeit </span>
               <LiveClock serverNow={board.serverNow} />
             </p>
           </div>
         </div>
+        {/* Kein Live-Bereich: Der Wert ändert sich bei jedem Polling. */}
         <div
-          role="status"
           className={cn(
             "rounded-md px-3 py-2 text-lg font-semibold tabular-nums",
             board.delaySeconds > 0
@@ -312,6 +362,7 @@ export function KitchenBoardView({ board }: { board: KitchenBoard }) {
                     onClick={() => {
                       if (!pending) run(() => pickUpAction(order.id));
                     }}
+                    aria-label={`Abgeholt: Bestellung #${order.number}`}
                   >
                     <PackageCheck aria-hidden /> Abgeholt
                   </Button>
@@ -332,7 +383,7 @@ export function KitchenBoardView({ board }: { board: KitchenBoard }) {
 
 /** Eigene Komponente, damit nur die Uhr im Sekundentakt neu rendert, nicht das Board. */
 function LiveClock({ serverNow }: { serverNow: Date }) {
-  const now = useServerNow(serverNow);
+  const { now } = useServerClock(serverNow);
   return <>{clock.format(now)}</>;
 }
 
@@ -345,7 +396,7 @@ function OvenTimer({
   slotSeconds: number;
   serverNow: Date;
 }) {
-  const now = useServerNow(serverNow);
+  const { now } = useServerClock(serverNow);
   const elapsed = ticket.ovenStartedAt
     ? Math.max(0, (now.getTime() - ticket.ovenStartedAt.getTime()) / 1000)
     : 0;
@@ -371,6 +422,7 @@ function OvenTimer({
               left < 0 && "text-terracotta",
             )}
           >
+            {left < 0 && <span className="sr-only">überfällig </span>}
             {left < 0 ? "+" : ""}
             {formatDuration(Math.abs(left))}
           </span>
@@ -384,7 +436,7 @@ function OvenTimer({
           aria-valuenow={Math.round(progress * 100)}
         >
           <div
-            className="h-full bg-terracotta transition-[width] duration-1000 ease-linear"
+            className="h-full bg-terracotta transition-[width] duration-1000 ease-linear motion-reduce:transition-none"
             style={{ width: `${progress * 100}%` }}
           />
         </div>

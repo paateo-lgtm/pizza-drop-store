@@ -22,7 +22,8 @@ export function AutoRefresh({
   useEffect(() => {
     let count = 0;
     const id = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
+      // Offline würde router.refresh() hart neu laden und auf der Fehlerseite landen.
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
       count += 1;
       if (count > maxTimes) {
         window.clearInterval(id);
@@ -31,7 +32,13 @@ export function AutoRefresh({
       }
       router.refresh();
     }, everyMs);
-    return () => window.clearInterval(id);
+    // Wieder online: sofort aktualisieren statt bis zu everyMs warten.
+    const now = () => router.refresh();
+    window.addEventListener("online", now);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("online", now);
+    };
   }, [everyMs, maxTimes, router]);
 
   return gaveUp ? fallback : null;

@@ -16,8 +16,13 @@ export function WakeLock() {
       if (document.visibilityState !== "visible") return;
       try {
         const next = await navigator.wakeLock.request("screen");
-        if (active) lock = next;
-        else void next.release();
+        if (active) {
+          // Schnelle Tab-Wechsel: die vorige Sperre nicht verwaist liegen lassen.
+          void lock?.release();
+          lock = next;
+        } else {
+          void next.release();
+        }
       } catch {
         // Akkusparmodus oder fehlende Berechtigung: Die Seite funktioniert trotzdem.
       }

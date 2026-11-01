@@ -6,6 +6,9 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth/token";
 // /login wird bewusst nicht umgeleitet: Ein Token kann gültig signiert, aber durch eine
 // Passwort- oder Rollenänderung längst beendet sein, sonst entstünde eine Schleife.
 export async function proxy(request: NextRequest) {
+  // Server Actions prüfen selbst (requireUser bzw. kitchenUser). Eine Umleitung hier
+  // käme im Client nur als unklarer Fehler an statt als „Sitzung abgelaufen“.
+  if (request.headers.has("next-action")) return NextResponse.next();
   const session = await verifySession(
     request.cookies.get(SESSION_COOKIE)?.value,
   );
