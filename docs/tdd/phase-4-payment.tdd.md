@@ -68,4 +68,9 @@
   - **Rate-Limiting** für `startPayment` folgt in Phase 10.
   - **Das Ablaufen offener Sessions** bei ablaufender Reservierung kommt mit dem Aufräum-Cron (Phase 7). Bis dahin fängt der Webhook späte Zahlungen ab.
   - **ORDER_LINK_SECRET** sollte in Vercel gesetzt werden.
-- **Noch nicht mit echtem Stripe getestet:** In `.env` fehlen `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` und `RESEND_API_KEY`. Webhook, Erstattung und Mail sind mit signierten Test-Events und einer Gateway-Attrappe geprüft. Der Weg über Stripe Checkout selbst ist nicht geprüft.
+- **Mit echtem Stripe (Sandbox) geprüft am 2026-11-01:**
+  - Reservierung (2 × Margherita, 21,00 €), Zahlung mit der Testkarte 4242 in Stripe Checkout.
+  - `stripe listen` leitet `checkout.session.completed` weiter, der Webhook antwortet 200.
+  - Bestellung `PAID` mit Payment-Intent, 2 Küchen-Tickets, Statusseite mit Abholcode und QR-Code.
+  - Admin-Storno: Bestellung `REFUNDED`, Tickets gelöscht, Erstattung über 21,00 € in Stripe `succeeded`.
+  - Mails nur protokolliert („nicht-gesendet“), weil `RESEND_API_KEY` fehlt. Der echte Mailversand ist noch nicht geprüft.
