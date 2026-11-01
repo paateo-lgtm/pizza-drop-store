@@ -187,6 +187,10 @@ describe("Kitchen-Mode", () => {
     });
     expect(board.next?.id).toBe(b.ticketIds[1]);
     expect(board.ready.map((o) => o.id)).toEqual([a.orderId]);
+    // Ausgabe-Suche: alle bezahlten Bestellungen, auch die noch im Ofen
+    expect(board.orders.map((o) => o.id).sort()).toEqual(
+      [a.orderId, b.orderId].sort(),
+    );
     expect(board.slots).toHaveLength(6);
     expect(await loadKitchenBoard("gibt-es-nicht")).toBeNull();
   });

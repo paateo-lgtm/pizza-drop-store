@@ -259,7 +259,10 @@ export async function loadKitchenBoard(dropId: string) {
         },
       },
       orders: {
-        where: { status: { in: ["READY", "PICKED_UP"] } },
+        // Bezahlte Bestellungen: für Abholbereit, Abgeholt und die Ausgabe-Suche
+        where: {
+          status: { in: ["PAID", "IN_PROGRESS", "READY", "PICKED_UP"] },
+        },
         orderBy: { pickupAt: "asc" },
         include: { items: { select: { nameSnapshot: true, quantity: true } } },
       },
@@ -347,6 +350,7 @@ export async function loadKitchenBoard(dropId: string) {
     delaySeconds: delaySeconds(tickets, drop.slotSeconds, now),
     average,
     slotHint: slotLengthHint(average, drop.slotSeconds),
+    orders,
     ready: orders.filter((o) => o.status === "READY"),
     pickedUp: orders.filter((o) => o.status === "PICKED_UP"),
     slots: drop.slots.map((s) => ({
