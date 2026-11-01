@@ -4,9 +4,10 @@
  * docs/PLAN.md, 3.2 und 3.3) – so bleiben mehrere Küchengeräte synchron.
  */
 import "server-only";
-import { Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import type { TicketStatus as DbTicketStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { isBusyError, lockDrop } from "@/lib/tx";
 import { effectiveStatus, slotStatus } from "@/lib/domain/drops";
 import {
   averageBakeSeconds,
@@ -35,17 +36,12 @@ const TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
 /** Kurzzeitig belegt (Sperre, Verbindung, Timeout): nochmal versuchen hilft. */
 const BUSY =
   "Gerade viel los – bitte gleich noch einmal tippen. Die Anzeige aktualisiert sich.";
-const BUSY_CODES = new Set(["P2024", "P2028", "P2034"]);
 /** Alles andere ist ein echter Fehler, den Wiederholen nicht behebt. */
 const BROKEN =
   "Technischer Fehler – bitte die Küchenleitung bzw. den Admin informieren.";
 
 const TICKET_GONE =
   "Diese Pizza gibt es nicht mehr – die Bestellung wurde storniert.";
-
-async function lockDrop(tx: Tx, dropId: string) {
-  await tx.$queryRaw`SELECT id FROM "Drop" WHERE id = ${dropId} FOR UPDATE`;
-}
 
 /** Führt eine Küchenaktion unter der Drop-Sperre aus und übersetzt Fehler in Meldungen. */
 async function underDropLock(
@@ -65,11 +61,8 @@ async function underDropLock(
   } catch (error) {
     if (error instanceof Rejection)
       return { ok: false, message: error.message };
-    const busy =
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      BUSY_CODES.has(error.code);
     console.error(`Küche: ${label} für ${target.id} fehlgeschlagen`, error);
-    return { ok: false, message: busy ? BUSY : BROKEN };
+    return { ok: false, message: isBusyError(error) ? BUSY : BROKEN };
   }
 }
 

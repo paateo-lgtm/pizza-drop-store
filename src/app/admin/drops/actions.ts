@@ -18,6 +18,7 @@ import {
 } from "@/lib/domain/drops";
 import { generateSlots } from "@/lib/domain/slots";
 import { shiftBerlinDays } from "@/lib/time";
+import { lockDrop } from "@/lib/tx";
 import { toFormState, type FormState } from "@/lib/validation/common";
 import { dropFormToObject, dropSchema } from "@/lib/validation/drop";
 
@@ -33,14 +34,6 @@ class ActionError extends Error {
 }
 
 const GONE = { ok: false, message: "Diesen Drop gibt es nicht mehr." };
-
-/**
- * Alle Änderungen an einem Drop laufen nacheinander: erst die Zeile sperren, dann den
- * aktuellen Stand lesen und prüfen (siehe docs/PLAN.md, 3.2).
- */
-async function lockDrop(tx: Tx, dropId: string) {
-  await tx.$queryRaw`SELECT id FROM "Drop" WHERE id = ${dropId} FOR UPDATE`;
-}
 
 /** Raster neu erzeugen; Sperren bleiben an gleicher Uhrzeit erhalten. */
 async function rebuildSlots(

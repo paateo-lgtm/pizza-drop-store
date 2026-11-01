@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { assignTickets, decideCheckout } from "@/lib/domain/payment";
+import { lockDrop } from "@/lib/tx";
 import type { PaymentGateway } from "./gateway";
 import { notifySafely, type Notify } from "./notify";
 
@@ -67,7 +68,7 @@ async function settleInTransaction(
     select: { dropId: true },
   });
   if (!found) return "unknown";
-  await tx.$queryRaw`SELECT id FROM "Drop" WHERE id = ${found.dropId} FOR UPDATE`;
+  await lockDrop(tx, found.dropId);
 
   const order = await tx.order.findUniqueOrThrow({
     where: { id: input.orderId },

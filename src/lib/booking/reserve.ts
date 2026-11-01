@@ -9,6 +9,7 @@ import {
   SOLD_ORDER_STATUSES,
 } from "@/lib/domain/booking";
 import { getSettings, type Settings } from "@/lib/settings";
+import { isBusyError, lockDrop } from "@/lib/tx";
 import { type FieldErrors, toFormState } from "@/lib/validation/common";
 import {
   reservationSchema,
@@ -74,15 +75,12 @@ export async function reserveOrder(
       );
     } catch (error) {
       if (error instanceof Rejection) return error.result;
-      const known = error instanceof Prisma.PrismaClientKnownRequestError;
       // Zu lange auf Verbindung oder Sperre gewartet: Last melden statt Fehlerseite.
-      if (known && error.code === "P2028") {
-        console.warn(
-          "Reservierung abgebrochen (Transaktion zu lang)",
-          error.message,
-        );
+      if (isBusyError(error)) {
+        console.warn("Reservierung abgebrochen (Datenbank belegt)", error);
         return BUSY;
       }
+      const known = error instanceof Prisma.PrismaClientKnownRequestError;
       // Doppelter Abholcode: mit neuem Code wiederholen.
       if (!(known && error.code === "P2002" && attempt < ATTEMPTS)) throw error;
     }
@@ -95,7 +93,7 @@ async function reserveInTransaction(
   settings: Settings,
   fixedNow: Date | undefined,
 ): Promise<ReserveResult> {
-  await tx.$queryRaw`SELECT id FROM "Drop" WHERE id = ${input.dropId} FOR UPDATE`;
+  await lockDrop(tx, input.dropId);
   // Erst nach dem Warten auf die Sperre: Die Reservierung gilt volle reservationMinutes.
   const now = fixedNow ?? new Date();
 

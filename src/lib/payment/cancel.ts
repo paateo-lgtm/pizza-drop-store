@@ -2,6 +2,7 @@ import "server-only";
 import Stripe from "stripe";
 import { db } from "@/lib/db";
 import { cancellationFor } from "@/lib/domain/payment";
+import { lockDrop } from "@/lib/tx";
 import type { PaymentGateway } from "./gateway";
 import { notifySafely, type Notify } from "./notify";
 
@@ -39,7 +40,7 @@ export async function cancelOrder(
         select: { dropId: true },
       });
       if (!found) throw new Rejection("Diese Bestellung gibt es nicht.");
-      await tx.$queryRaw`SELECT id FROM "Drop" WHERE id = ${found.dropId} FOR UPDATE`;
+      await lockDrop(tx, found.dropId);
 
       const order = await tx.order.findUniqueOrThrow({
         where: { id: orderId },
