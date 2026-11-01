@@ -161,6 +161,13 @@ describe("Kitchen-Mode", () => {
       ok: false,
       message: expect.stringMatching(/gibt es nicht/),
     });
+
+    // Die Ausgabe-Suche findet sie trotzdem – als „storniert“, nicht als „unbekannt“
+    const board = await loadKitchenBoard(drop.id);
+    expect(board?.orders).toEqual([
+      expect.objectContaining({ id: orderId, status: "REFUNDED" }),
+    ]);
+    expect(board?.ready).toEqual([]);
   });
 
   it("meldet, wenn kein freier Slot mehr kommt", async () => {
