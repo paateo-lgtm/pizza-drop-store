@@ -1,4 +1,4 @@
-# TDD-Nachweis Phase 5: Kitchen-Mode (Teil 1)
+# TDD-Nachweis Phase 5: Kitchen-Mode
 
 **Quelle:** `docs/PLAN.md` (1.4 Kitchen-Mode, 3.3 Kitchen-Timeline, Phase 5 in Abschnitt 5).
 **ECC:**
@@ -13,10 +13,10 @@
 - Puffer-Slot, Ausgabe „Abgeholt“, Live-Status für Kunden
 - Mehrere Geräte per Polling, Wake Lock
 
-**Teil 2 (offen):**
+**Umfang Teil 2:**
 
-- Ausgabe mit Suche und QR-Scan
-- PWA-Manifest
+- Ausgabe mit Suche (Nummer, Name, Abholcode) und QR-Scan
+- Küche als installierbare App (Manifest, Icons)
 
 ## User Journeys
 
@@ -95,3 +95,55 @@
   - **Wake Lock:** Gibt der Browser die Sperre selbst frei, gibt es keinen Hinweis.
   - **Ein Ofen:** Er wird nur über die Drop-Sperre erzwungen, nicht per Datenbank-Constraint.
   - **Phase 5, Teil 2:** Suche und QR-Scan bei der Ausgabe, PWA-Manifest.
+
+## Teil 2: Ausgabe und App
+
+### User Journeys
+
+- Als Theke finde ich eine Bestellung per Nummer, Name, Abholcode oder QR-Code und gebe sie nur aus, wenn sie fertig ist – stornierte Bestellungen sind klar als „NICHT ausgeben“ markiert.
+- Als Küche installiere ich den Kitchen-Mode als App auf dem Tablet.
+
+### RED → GREEN
+
+| Schritt                                             | RED                                         | GREEN                           |
+| --------------------------------------------------- | ------------------------------------------- | ------------------------------- |
+| Suche und QR-Abholcode ()                           | : vitest bricht ab, weil fehlt              | : 7 Tests grün                  |
+| Board liefert alle bezahlten Bestellungen           | Board-Test: fehlt (TypeError)               | : 7 Integrationstests grün      |
+| Küchen-Manifest mit Icons                           | : liefert 404                               | : PWA-E2E grün                  |
+| Review: Ziffern-Abholcode als Bestellnummer gelesen | : Code „234567“ nicht gefunden              | : Code vor Nummer               |
+| Review: Stornierte fehlen in der Ausgabe            | : Board liefert erstattete Bestellung nicht | : als „NICHT ausgeben“ gelistet |
+
+### Was die Tests garantieren
+
+| #   | Garantie                                                                                                                                                                                         | Test                                      | Art         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- | ----------- |
+| 13  | Suche nach Nummer (auch mit #), Abholcode (auch nur Ziffern, Groß/klein egal) und Namensteil ohne Akzente; abholbereit zuerst, Stornierte und Abgeholte hinten; höchstens 6 Treffer              |                                           | Unit        |
+| 14  | Aus dem QR-Code zählt nur ein gültiger Abholcode                                                                                                                                                 | › parseScannedCode                        | Unit        |
+| 15  | Board liefert alle je bezahlten Bestellungen inkl. stornierter; Abholbereit bleibt gefiltert                                                                                                     |                                           | Integration |
+| 16  | Ausgabe: Treffer vor dem Backen zeigt „Wartet auf den Ofen“ ohne Ausgabe-Knopf; QR-Scan füllt die Suche; Ausgabe setzt PICKED_UP; Fokus zurück in die Suche; fremder Code bekommt eigene Meldung | (Kamera und BarcodeDetector nachgebildet) | E2E         |
+| 17  | Manifest der Küche: Start und Scope , standalone/fullscreen, PNG-Icons (any und maskable, Apple 180 px); Kundenseite ohne Manifest                                                               |                                           | E2E         |
+
+### Befehle und Ergebnisse (zuletzt ausgeführt)
+
+- Unknown command: "test"
+
+Did you mean this?
+npm test # Test a package
+To see a list of supported npm commands, run:
+npm help: 178 Tests bestanden
+
+- : 30 Tests bestanden
+- : 33 bestanden, 3 übersprungen (Küche nicht mobil)
+- , , Checking formatting...
+  All matched files use Prettier code style!: sauber
+
+### browser-qa (lokal, Testdaten)
+
+- axe-core (WCAG 2.2 AA) mit offenem Suchergebnis und offenem Scan-Dialog: 0 Verstöße
+- Fokus: im Dialog auf „Schließen“, nach Escape zurück auf „QR scannen“; keine Konsolenfehler, keine 4xx/5xx; Manifest-Link im Board vorhanden
+- Visueller Vergleich: INCONCLUSIVE (keine Baseline). Echte Kamera nicht geprüft – im Test ersetzt eine leere Leinwand die Kamera.
+
+### Reviews und Umgang damit
+
+- **Behoben:** stornierte Bestellungen in der Ausgabe („NICHT ausgeben“); Ziffern-Codes; eigene Meldung für Codes aus anderen Drops; natives mit Fokusfalle, Escape und Fokus-Rückgabe; Hinweis bei fremdem QR-Code; Scanner meldet dauerhafte Lesefehler und unterscheidet verweigerte und fehlende Kamera; Live-Bereich der Suche immer vorhanden; Fokus nach „Abgeholt“ zurück in die Suche; Manifest mit , getrennten Icon-Zwecken, und Apple-Icon 180 px.
+- **Bewusst offen:** Namenssuche auch bei Eingaben im Code-Format (sonst fände man Namen wie „Martha“ nicht; die Trefferkarte zeigt Name und Code). Kein QR-Scan ohne BarcodeDetector (iPad Safari): dort wird der Code eingetippt. Kein Service Worker; offline zeigt das Board den letzten Stand mit Warnung. ohne Schrägstrich, damit selbst im Bereich liegt.
