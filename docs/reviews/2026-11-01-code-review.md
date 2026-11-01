@@ -172,9 +172,10 @@
   - 1.5 Bestellseite (`db12af2`)
   - 2.1 als einfacher Schritt: Polling 3 s bzw. 6 s (`e1a3061`)
 - **Gegenprüfung durch `code-reviewer`:** keine kritischen, schweren oder mittleren Befunde.
-- **Offen nach Plan:**
-  - 2.3 Indizes, mit der Migration für die Warteliste
-  - 2.2, 2.4 und 2.5 nach Bedarf
+- **Schritt 4:** 2.3 mit der Migration der Warteliste (`176e2a0`).
+  - Indizes `EmailLog(kind, createdAt)` und `Subscriber(status, confirmedAt)`.
+  - Statt `text_pattern_ops` sucht der Drop-Alarm erledigte Mails über exakte Schlüssel; das nutzt den Unique-Index. Prisma meldet Indizes mit raw-ops bei jedem Abgleich als Abweichung.
+- **Offen nach Plan:** 2.2, 2.4 und 2.5 nach Bedarf
 
 ## Vorgeschlagene Reihenfolge
 
