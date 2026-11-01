@@ -173,11 +173,16 @@ export async function sendDueDropAlerts(
   const run: AlertRun = { sent: 0, skipped: 0, failed: 0, remaining: 0 };
   let attempts = 0;
   for (const drop of due) {
-    const prefix = alertMailKey(drop.id, "");
+    const subscribers = await db.subscriber.findMany({
+      where: { status: "CONFIRMED" },
+      orderBy: { confirmedAt: "asc" },
+      select: { id: true, email: true, token: true },
+    });
     // Erledigt oder gerade in Arbeit; gescheiterte bzw. übersprungene zählen nicht.
+    // Exakte Schlüssel statt Präfixsuche: trifft den Unique-Index auf dedupeKey.
     const done = await db.emailLog.findMany({
       where: {
-        dedupeKey: { startsWith: prefix },
+        dedupeKey: { in: subscribers.map((s) => alertMailKey(drop.id, s.id)) },
         OR: [
           { providerId: null },
           { providerId: { notIn: [MAIL_FAILED, MAIL_SKIPPED] } },
@@ -185,13 +190,10 @@ export async function sendDueDropAlerts(
       },
       select: { dedupeKey: true },
     });
-    const doneIds = new Set(done.map((d) => d.dedupeKey.slice(prefix.length)));
-    const subscribers = await db.subscriber.findMany({
-      where: { status: "CONFIRMED" },
-      orderBy: { confirmedAt: "asc" },
-      select: { id: true, email: true, token: true },
-    });
-    const open = subscribers.filter((s) => !doneIds.has(s.id));
+    const doneKeys = new Set(done.map((d) => d.dedupeKey));
+    const open = subscribers.filter(
+      (s) => !doneKeys.has(alertMailKey(drop.id, s.id)),
+    );
 
     for (const subscriber of open) {
       const outOfTime =

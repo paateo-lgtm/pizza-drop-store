@@ -313,6 +313,8 @@ model Subscriber {
   confirmedAt    DateTime?        @db.Timestamptz
   unsubscribedAt DateTime?        @db.Timestamptz
   createdAt      DateTime         @default(now()) @db.Timestamptz
+
+  @@index([status, confirmedAt])
 }
 
 model WaitlistEntry {
@@ -320,6 +322,8 @@ model WaitlistEntry {
   dropId           String
   email            String
   quantity         Int
+  /// Für den Austragen-Link in der Benachrichtigung
+  token            String    @unique
   notifiedAt       DateTime? @db.Timestamptz
   convertedOrderId String?
   createdAt        DateTime  @default(now()) @db.Timestamptz
@@ -375,4 +379,6 @@ model EmailLog {
   dedupeKey String   @unique
   providerId String?
   createdAt DateTime @default(now()) @db.Timestamptz
+
+  @@index([kind, createdAt])
 }
