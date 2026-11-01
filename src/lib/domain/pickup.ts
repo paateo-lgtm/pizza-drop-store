@@ -40,13 +40,13 @@ export function findPickupOrders<T extends PickupOrder>(
   const q = query.trim().replace(/^#/, "").trim();
   if (!q) return [];
 
-  let hits: T[];
-  if (/^\d+$/.test(q)) {
-    hits = orders.filter((o) => o.number === Number(q));
-  } else {
-    const code = q.toUpperCase();
-    hits = orders.filter((o) => o.pickupCode === code);
-    if (hits.length === 0) {
+  // Erst der Abholcode: Er kann auch nur aus Ziffern bestehen (z. B. „234567“).
+  const code = q.toUpperCase();
+  let hits = orders.filter((o) => o.pickupCode === code);
+  if (hits.length === 0) {
+    if (/^\d+$/.test(q)) {
+      hits = orders.filter((o) => o.number === Number(q));
+    } else {
       const name = normalize(q);
       hits =
         name.length < MIN_NAME_QUERY
