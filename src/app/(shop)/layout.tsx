@@ -28,10 +28,11 @@ export default function ShopLayout({ children }: LayoutProps<"/">) {
 
       <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 border-t border-line px-4 py-8 text-sm sm:px-8">
         <Wordmark className="text-xl" />
-        <nav className="flex gap-5 text-ink-muted">
+        <nav className="flex flex-wrap gap-x-5 gap-y-2 text-ink-muted">
           <Link href="/impressum">Impressum</Link>
           <Link href="/datenschutz">Datenschutz</Link>
           <Link href="/agb">AGB</Link>
+          <Link href="/allergene">Allergene</Link>
         </nav>
       </footer>
       <Toaster position="top-center" />

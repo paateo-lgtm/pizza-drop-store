@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
+import { legalReady } from "@/lib/content/store";
 import { sendConfirmMail } from "@/lib/marketing/alert-mails";
 import {
   confirmMailsLastHour,
@@ -53,6 +54,10 @@ export async function signUpForAlert(
   const parsed = email.safeParse(String(formData.get("email") ?? "").trim());
   if (!parsed.success) {
     return { ok: false, message: "Bitte eine gültige E-Mail-Adresse angeben." };
+  }
+  // Ohne Impressum keine Anmeldung, auch nicht an der ausgeblendeten Seite vorbei.
+  if (!(await legalReady())) {
+    return { ok: false, message: "Die Anmeldung ist gerade nicht möglich." };
   }
   after(async () => {
     try {

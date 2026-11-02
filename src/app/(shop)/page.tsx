@@ -15,6 +15,7 @@ import {
   toBandState,
 } from "@/lib/booking/display";
 import { featuredDrop, getUpcomingDrops } from "@/lib/booking/shop";
+import { getContent, legalReady } from "@/lib/content/store";
 import { formatLongDate, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AlarmSignup } from "./alarm/signup-form";
@@ -26,53 +27,84 @@ export default function Home() {
         <Drops />
       </Suspense>
 
+      <Suspense>
+        <Sections />
+      </Suspense>
+    </>
+  );
+}
+
+/** Pflegbare Texte (Admin „Inhalte & Recht“), FAQ und Drop-Alarm. */
+async function Sections() {
+  await connection();
+  const [landing, faq, ready] = await Promise.all([
+    getContent("landing"),
+    getContent("faq"),
+    legalReady(),
+  ]);
+
+  return (
+    <>
       <section
         id="so-gehts"
         className="mx-auto w-full max-w-6xl scroll-mt-4 px-4 py-20 sm:px-8"
       >
         <h2 className="text-4xl">So funktioniert&apos;s</h2>
         <ol className="mt-10 grid gap-10 sm:grid-cols-3">
-          {[
-            [
-              "Pizzen wählen",
-              "Stell dir deine Bestellung aus der Karte des Drops zusammen.",
-            ],
-            [
-              "Abholzeit sichern",
-              "Jede Pizza belegt einen Slot im Ofen. Du siehst sofort, wann alles fertig ist.",
-            ],
-            [
-              "Bezahlen & abholen",
-              "Online bezahlen, zur Abholzeit vorbeikommen, Code zeigen, genießen.",
-            ],
-          ].map(([title, text], i) => (
-            <li key={title}>
+          {landing.steps.map((step, i) => (
+            <li key={i}>
               <span className="font-serif text-5xl text-olive italic">
                 {i + 1}
               </span>
-              <h3 className="mt-2 text-2xl">{title}</h3>
-              <p className="mt-2 text-ink-muted">{text}</p>
+              <h3 className="mt-2 text-2xl">{step.title}</h3>
+              <p className="mt-2 text-ink-muted">{step.text}</p>
             </li>
           ))}
         </ol>
       </section>
 
-      <section
-        id="drop-alarm"
-        aria-labelledby="drop-alarm-titel"
-        className="border-t border-line bg-surface"
-      >
-        <div className="mx-auto w-full max-w-6xl scroll-mt-4 px-4 py-16 sm:px-8">
-          <h2 id="drop-alarm-titel" className="text-4xl">
-            Keinen Drop verpassen
+      {faq.length > 0 && (
+        <section
+          id="fragen"
+          aria-labelledby="fragen-titel"
+          className="mx-auto w-full max-w-6xl scroll-mt-4 px-4 pb-20 sm:px-8"
+        >
+          <h2 id="fragen-titel" className="text-4xl">
+            Häufige Fragen
           </h2>
-          <p className="mt-3 max-w-xl text-lg text-ink-muted">
-            Die Slots sind oft schnell weg. Mit dem Drop-Alarm weißt du als
-            Erste:r, wenn der Verkauf startet.
-          </p>
-          <AlarmSignup />
-        </div>
-      </section>
+          <div className="mt-8 max-w-3xl divide-y divide-line border-y border-line">
+            {faq.map((item, i) => (
+              <details key={i} className="group py-4">
+                <summary className="cursor-pointer list-none text-xl group-open:text-olive marker:hidden">
+                  {item.question}
+                </summary>
+                <p className="mt-3 whitespace-pre-line text-ink-muted">
+                  {item.answer}
+                </p>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Anmeldung erst mit vollständigem Impressum (Datenschutz verlinkt dorthin) */}
+      {ready && (
+        <section
+          id="drop-alarm"
+          aria-labelledby="drop-alarm-titel"
+          className="border-t border-line bg-surface"
+        >
+          <div className="mx-auto w-full max-w-6xl scroll-mt-4 px-4 py-16 sm:px-8">
+            <h2 id="drop-alarm-titel" className="text-4xl">
+              Keinen Drop verpassen
+            </h2>
+            <p className="mt-3 max-w-xl text-lg text-ink-muted">
+              {landing.alarmText}
+            </p>
+            <AlarmSignup />
+          </div>
+        </section>
+      )}
     </>
   );
 }
@@ -221,19 +253,21 @@ function SaleNote({ data, now }: { data: DropAvailability; now: Date }) {
   );
 }
 
-function NoDrop() {
+async function NoDrop() {
+  const landing = await getContent("landing");
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pt-10 pb-16 sm:px-8 sm:pt-16">
       <p className="text-sm font-medium tracking-wide text-terracotta uppercase">
         Nächster Drop
       </p>
       <h1 className="mt-4 max-w-3xl text-5xl leading-[1.05] sm:text-6xl">
-        Gerade ist kein Drop geplant.
+        {landing.noDropTitle}
       </h1>
-      <p className="mt-5 max-w-xl text-lg text-ink-muted">
-        Der Ofen ruht. Sobald der nächste Termin steht, findest du ihn hier –
-        mit Karte und freien Abholzeiten.
-      </p>
+      {landing.noDropText && (
+        <p className="mt-5 max-w-xl text-lg text-ink-muted">
+          {landing.noDropText}
+        </p>
+      )}
     </section>
   );
 }
@@ -241,6 +275,7 @@ function NoDrop() {
 function HeroSkeleton() {
   return (
     <section
+      role="status"
       className="mx-auto w-full max-w-6xl px-4 pt-10 pb-16 sm:px-8 sm:pt-16"
       aria-busy="true"
       aria-label="Nächster Drop lädt"

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { legalReady } from "@/lib/content/store";
 import { joinWaitlist, leaveWaitlist } from "@/lib/marketing/waitlist";
 
 export type WaitlistState = { ok: boolean; message: string } | null;
@@ -33,6 +34,10 @@ export async function joinWaitlistAction(
   });
   if (!parsed.success) {
     return { ok: false, message: "Bitte eine gültige E-Mail-Adresse angeben." };
+  }
+  // Ohne Impressum keine Anmeldung, auch nicht an der ausgeblendeten Seite vorbei.
+  if (!(await legalReady())) {
+    return { ok: false, message: "Die Anmeldung ist gerade nicht möglich." };
   }
   try {
     const result = await joinWaitlist(parsed.data);

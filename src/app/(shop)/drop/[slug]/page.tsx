@@ -7,6 +7,7 @@ import { Suspense, type ReactNode } from "react";
 import { Countdown } from "@/components/countdown";
 import { saleState } from "@/lib/booking/display";
 import { getShopDrop } from "@/lib/booking/shop";
+import { legalReady } from "@/lib/content/store";
 import { formatLongDate, formatTime } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { OrderForm } from "./order-form";
@@ -36,9 +37,10 @@ async function DropContent({
   await connection();
   const { slug } = await params;
   const now = new Date();
-  const [data, settings] = await Promise.all([
+  const [data, settings, ready] = await Promise.all([
     getShopDrop(slug, now),
     getSettings(),
+    legalReady(),
   ]);
   if (!data) notFound();
 
@@ -140,7 +142,7 @@ async function DropContent({
         closedNote={notes[state]}
       />
       {/* Außerhalb des Bestellformulars: Formulare dürfen nicht verschachtelt sein */}
-      {state === "soldOut" && (
+      {state === "soldOut" && ready && (
         <WaitlistForm dropId={drop.id} maxPerOrder={drop.maxPizzasPerOrder} />
       )}
     </>
