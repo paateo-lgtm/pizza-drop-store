@@ -137,7 +137,9 @@ test.describe("Kundenbuchung", () => {
 
     const url = new URL(page.url());
     await page.goto(`${url.pathname}?k=falsch`);
-    await expect(page.getByText("This page could not be found.")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Diese Seite gibt es nicht." }),
+    ).toBeVisible();
     await expect(page.getByText("Margherita")).toHaveCount(0);
   });
 });
