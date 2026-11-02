@@ -11,9 +11,13 @@ export type Fact = { label: string; value: string | number; hint?: string };
 
 export function FactGrid({ facts }: { facts: Fact[] }) {
   return (
-    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-[var(--line)] md:grid-cols-4">
+    // Einzelne Kacheln: eine unvollständige letzte Reihe lässt keine Lücke im Raster
+    <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {facts.map((fact) => (
-        <div key={fact.label} className="flex flex-col gap-1 bg-surface p-4">
+        <div
+          key={fact.label}
+          className="flex flex-col gap-1 rounded-md border border-line bg-surface p-4"
+        >
           <dt className="text-sm text-ink-muted">{fact.label}</dt>
           <dd className="font-serif text-3xl tabular-nums">{fact.value}</dd>
           {fact.hint && <dd className="text-xs text-ink-muted">{fact.hint}</dd>}
@@ -66,7 +70,7 @@ export function PizzaTable({ pizzas }: { pizzas: PizzaRow[] }) {
       <thead className="text-left text-ink-muted">
         <tr className="border-b border-line">
           <th className="py-2 font-normal">Pizza</th>
-          <th className="w-2/5 py-2 font-normal">
+          <th className="hidden w-2/5 py-2 font-normal sm:table-cell">
             <span className="sr-only">Anteil als Balken</span>
           </th>
           <th className="py-2 text-right font-normal">Stück</th>
@@ -78,7 +82,7 @@ export function PizzaTable({ pizzas }: { pizzas: PizzaRow[] }) {
         {pizzas.map((p) => (
           <tr key={p.name}>
             <td className="py-2 pr-3">{p.name}</td>
-            <td className="py-2 pr-3" aria-hidden>
+            <td className="hidden py-2 pr-3 sm:table-cell" aria-hidden>
               <div
                 className="h-2 rounded-r-[4px] bg-olive"
                 style={{ width: `${(p.quantity / max) * 100}%` }}
@@ -101,7 +105,7 @@ export function PizzaTable({ pizzas }: { pizzas: PizzaRow[] }) {
 
 const W = 600;
 const H = 200;
-const PAD = { top: 12, right: 12, bottom: 24, left: 36 };
+const PAD = { top: 12, right: 12, bottom: 8, left: 44 };
 
 /** Kumulierter Verkauf als Treppenlinie; Kapazität als gestrichelte Bezugslinie */
 export function SalesChart({
@@ -139,6 +143,7 @@ export function SalesChart({
           y1={y(0)}
           y2={y(0)}
           stroke="var(--line)"
+          vectorEffect="non-scaling-stroke"
         />
         {capacity > 0 && (
           <>
@@ -149,13 +154,14 @@ export function SalesChart({
               y2={y(capacity)}
               stroke="currentColor"
               strokeDasharray="4 4"
+              vectorEffect="non-scaling-stroke"
             />
             <text
               x={PAD.left - 6}
               y={y(capacity)}
               textAnchor="end"
               dominantBaseline="middle"
-              fontSize="11"
+              fontSize="16"
               fill="currentColor"
             >
               {capacity}
@@ -167,7 +173,7 @@ export function SalesChart({
           y={y(0)}
           textAnchor="end"
           dominantBaseline="middle"
-          fontSize="11"
+          fontSize="16"
           fill="currentColor"
         >
           0
@@ -177,6 +183,7 @@ export function SalesChart({
           fill="none"
           stroke="var(--olive)"
           strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
         />
         {points.slice(1).map((p, i) => (
           <circle
@@ -191,21 +198,18 @@ export function SalesChart({
             <title>{`${formatTime(p.at)} Uhr: ${p.pizzas} verkauft`}</title>
           </circle>
         ))}
-        <text x={PAD.left} y={H - 6} fontSize="11" fill="currentColor">
-          {formatTime(new Date(start))}
-        </text>
-        <text
-          x={W - PAD.right}
-          y={H - 6}
-          textAnchor="end"
-          fontSize="11"
-          fill="currentColor"
-        >
-          {formatTime(new Date(end))}
-        </text>
       </svg>
+      {/* Zeitachse als HTML, damit die Schrift auf dem Handy nicht mitschrumpft */}
+      <div
+        className="flex justify-between text-xs text-ink-muted tabular-nums"
+        style={{ paddingLeft: `${(PAD.left / W) * 100}%` }}
+      >
+        <span>{formatTime(new Date(start))}</span>
+        <span>{formatTime(new Date(end))}</span>
+      </div>
       <figcaption className="mt-2 text-xs text-ink-muted">
-        Kumuliert nach Zahlungszeit, ab Verkaufsstart. Gestrichelt: Kapazität.
+        Kumuliert nach Zahlungszeit, ab Verkaufsstart. Gestrichelt: Kapazität (
+        {capacity} Pizzen).
       </figcaption>
     </figure>
   );
