@@ -5,6 +5,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { audit, changedFields } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/dal";
 import { db } from "@/lib/db";
+import { lockCoupon, lockDrop } from "@/lib/tx";
 import { toFormState, type FormState } from "@/lib/validation/common";
 import { couponFormToObject, couponSchema } from "@/lib/validation/coupon";
 
@@ -32,12 +33,21 @@ export async function saveCoupon(
     return { ok: false, message: "Diesen Gutschein gibt es nicht mehr." };
   }
   const drops = { create: dropIds.map((dropId) => ({ dropId })) };
+  // Gleiche Sperrreihenfolge wie die Reservierung (erst Drops, dann Gutschein): Die
+  // Zuordnungen prüfen per Fremdschlüssel die Drop-Zeilen, sonst droht ein Deadlock.
+  const touched = [
+    ...new Set([...dropIds, ...(existing?.drops.map((d) => d.dropId) ?? [])]),
+  ].sort();
 
   try {
     if (existing) {
-      await db.coupon.update({
-        where: { id: existing.id },
-        data: { ...values, drops: { deleteMany: {}, ...drops } },
+      await db.$transaction(async (tx) => {
+        for (const dropId of touched) await lockDrop(tx, dropId);
+        await lockCoupon(tx, existing.id);
+        await tx.coupon.update({
+          where: { id: existing.id },
+          data: { ...values, drops: { deleteMany: {}, ...drops } },
+        });
       });
       await audit({
         userId: user.id,
@@ -50,7 +60,11 @@ export async function saveCoupon(
         ),
       });
     } else {
-      const created = await db.coupon.create({ data: { ...values, drops } });
+      // Neu: Niemand kann ihn schon einlösen; nur die Drop-Zuordnungen sperren.
+      const created = await db.$transaction(async (tx) => {
+        for (const dropId of touched) await lockDrop(tx, dropId);
+        return tx.coupon.create({ data: { ...values, drops } });
+      });
       await audit({
         userId: user.id,
         action: "create",

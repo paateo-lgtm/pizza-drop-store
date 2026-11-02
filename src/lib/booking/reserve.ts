@@ -167,7 +167,7 @@ async function reserveInTransaction(
         dropId: drop.id,
         now,
         subtotalCents: cart.subtotalCents,
-        customerId: existing?.id ?? null,
+        email: input.email,
       })
     : null;
   if (coupon && !coupon.ok) {

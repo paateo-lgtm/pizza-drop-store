@@ -29,11 +29,7 @@ export async function startPayment(
   }
   const order = await db.order.findUnique({
     where: { id: orderId },
-    include: {
-      items: true,
-      customer: { select: { email: true } },
-      coupon: { select: { code: true } },
-    },
+    include: { items: true, customer: { select: { email: true } } },
   });
   if (!order || !canStartPayment(order.status, order.expiresAt, new Date())) {
     return {
@@ -79,9 +75,8 @@ export async function startPayment(
                 currency: "eur",
                 duration: "once",
                 max_redemptions: 1,
-                name: `Gutschein ${order.coupon?.code ?? ""}`
-                  .trim()
-                  .slice(0, 40),
+                // Aus festen Bestelldaten: Gleicher Idempotenz-Schlüssel braucht gleiche Parameter.
+                name: `Gutschein · Bestellung ${order.number}`,
               },
               { idempotencyKey: `coupon:${order.id}` },
             )

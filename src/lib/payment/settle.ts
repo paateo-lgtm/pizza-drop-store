@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
+import { couponLimitExceeded } from "@/lib/booking/coupon";
 import { db } from "@/lib/db";
 import { assignTickets, decideCheckout } from "@/lib/domain/payment";
 import { lockDrop } from "@/lib/tx";
@@ -121,7 +122,17 @@ async function settleInTransaction(
       `Betrag passt nicht zu Bestellung ${order.number}: ${paidCents} ${input.currency} statt ${order.totalCents} eur – wird erstattet`,
     );
   }
-  if (decision === "accept" && !amountMismatch) {
+  // Nach Ablauf der Reservierung war die Einlösung frei; ist sie inzwischen vergeben, erstatten.
+  const couponTaken =
+    decision === "accept" &&
+    !amountMismatch &&
+    (await couponLimitExceeded(tx, order, now));
+  if (couponTaken) {
+    console.warn(
+      `Gutschein von Bestellung ${order.number} inzwischen vergeben – wird erstattet`,
+    );
+  }
+  if (decision === "accept" && !amountMismatch && !couponTaken) {
     await tx.order.update({
       where: { id: order.id },
       data: {
@@ -170,7 +181,9 @@ async function settleInTransaction(
       amountCents: paidCents,
       reason: amountMismatch
         ? "Gezahlter Betrag passt nicht zur Bestellung"
-        : "Zahlung nach Ablauf der Reservierung",
+        : couponTaken
+          ? "Gutschein nach Ablauf der Reservierung vergeben"
+          : "Zahlung nach Ablauf der Reservierung",
     },
   });
   await tx.kitchenTicket.deleteMany({ where: { orderId: order.id } });
