@@ -11,17 +11,46 @@ export type FeedbackOrder = {
   hasFeedback: boolean;
 };
 
-export function isFeedbackDue(_order: FeedbackOrder, _now: Date): boolean {
-  throw new Error("noch nicht umgesetzt");
+const HOUR = 3_600_000;
+/** Erst fragen, wenn die Pizza gegessen ist. */
+export const FEEDBACK_DELAY_MS = 3 * HOUR;
+/** Danach nicht mehr fragen – auch nicht für alte Bestellungen beim Start der Funktion. */
+export const FEEDBACK_ASK_UNTIL_MS = 72 * HOUR;
+/** So lange nimmt der Link eine Bewertung an. */
+export const FEEDBACK_OPEN_MS = 30 * 24 * HOUR;
+
+const sincePickup = (order: Pick<FeedbackOrder, "pickedUpAt">, now: Date) =>
+  order.pickedUpAt ? now.getTime() - order.pickedUpAt.getTime() : null;
+
+/**
+ * Anfrage fällig? Nur mit Einwilligung aus dem Checkout: Feedback-Anfragen gelten nach
+ * BGH-Rechtsprechung als Werbung.
+ */
+export function isFeedbackDue(order: FeedbackOrder, now: Date): boolean {
+  const age = sincePickup(order, now);
+  return (
+    order.status === "PICKED_UP" &&
+    order.feedbackConsent &&
+    !order.hasFeedback &&
+    age !== null &&
+    age >= FEEDBACK_DELAY_MS &&
+    age <= FEEDBACK_ASK_UNTIL_MS
+  );
 }
 
 export function feedbackState(
-  _order: Omit<FeedbackOrder, "feedbackConsent">,
-  _now: Date,
+  order: Omit<FeedbackOrder, "feedbackConsent">,
+  now: Date,
 ): "open" | "done" | "closed" {
-  throw new Error("noch nicht umgesetzt");
+  if (order.hasFeedback) return "done";
+  const age = sincePickup(order, now);
+  if (order.status !== "PICKED_UP" || age === null || age > FEEDBACK_OPEN_MS) {
+    return "closed";
+  }
+  return "open";
 }
 
-export function feedbackMailKey(_orderId: string): string {
-  throw new Error("noch nicht umgesetzt");
+/** Pro Bestellung höchstens eine Anfrage. */
+export function feedbackMailKey(orderId: string): string {
+  return `feedback:${orderId}`;
 }
