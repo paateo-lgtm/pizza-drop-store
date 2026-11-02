@@ -3,6 +3,8 @@ import { fixtures } from "../../../test/db-fixtures";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { priceBreakdown } from "@/lib/domain/booking";
+import type { PaymentGateway } from "@/lib/payment/gateway";
+import { settleCheckout } from "@/lib/payment/settle";
 import { getSettings } from "@/lib/settings";
 import { reserveOrder } from "./reserve";
 
@@ -157,5 +159,77 @@ describe("Gutschein bei der Reservierung", () => {
     expect(
       await db.order.findUniqueOrThrow({ where: { id: result.orderId } }),
     ).toMatchObject({ discountCents: 0, totalCents: 2100, couponId: null });
+  });
+});
+
+describe("Review: Grenzen auch bei Gleichzeitigkeit und später Zahlung", () => {
+  it("zählt pro E-Mail, auch wenn eine neue Adresse parallel zweimal bucht", async () => {
+    const a = await f.drop("neu-a", 6, [pizza.id]);
+    const b = await f.drop("neu-b", 6, [pizza.id]);
+    const c = await coupon("NEUKUNDE", { maxPerCustomer: 1 });
+    const results = await Promise.all([
+      reserveOrder(input(a.id, 13, c.code)),
+      reserveOrder(input(b.id, 13, c.code)),
+    ]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+  });
+
+  const gateway = () => {
+    const refunds: string[] = [];
+    const fake: PaymentGateway = {
+      async refund(paymentIntentId, _amount, key) {
+        refunds.push(paymentIntentId);
+        return { id: `re_${key}` };
+      },
+    };
+    return { refunds, gateway: fake };
+  };
+
+  /** Reservierung mit Gutschein, die abläuft, bevor die Zahlung ankommt */
+  async function lapsed(dropKey: string, customer: number, code: string) {
+    const drop = await f.drop(dropKey, 6, [pizza.id]);
+    const result = await reserveOrder(input(drop.id, customer, code));
+    if (!result.ok) throw new Error(result.message);
+    await db.order.update({
+      where: { id: result.orderId },
+      data: { status: "EXPIRED", expiresAt: new Date(Date.now() - 60_000) },
+    });
+    return db.order.findUniqueOrThrow({ where: { id: result.orderId } });
+  }
+
+  const pay = (order: { id: string; totalCents: number }, event: string) => ({
+    eventId: `${RUN}-${event}`,
+    orderId: order.id,
+    sessionId: `cs_${RUN}_${event}`,
+    paymentIntentId: `pi_${RUN}_${event}`,
+    amountTotal: order.totalCents,
+    currency: "eur",
+  });
+
+  it("erstattet eine späte Zahlung, wenn der Gutschein inzwischen vergeben ist", async () => {
+    const c = await coupon("SPAET", { maxRedemptions: 1 });
+    const late = await lapsed("spaet-a", 14, c.code);
+    const other = await f.drop("spaet-b", 6, [pizza.id]);
+    expect((await reserveOrder(input(other.id, 15, c.code))).ok).toBe(true);
+
+    const g = gateway();
+    const result = await settleCheckout(pay(late, "spaet"), {
+      gateway: g.gateway,
+      notify: async () => {},
+    });
+    expect(result).toBe("refunded");
+    expect(g.refunds).toEqual([`pi_${RUN}_spaet`]);
+  });
+
+  it("nimmt eine späte Zahlung an, solange der Gutschein noch frei ist", async () => {
+    const c = await coupon("NOCHFREI", { maxRedemptions: 1 });
+    const late = await lapsed("nochfrei", 16, c.code);
+    const g = gateway();
+    const result = await settleCheckout(pay(late, "nochfrei"), {
+      gateway: g.gateway,
+      notify: async () => {},
+    });
+    expect(result).toBe("accepted");
+    expect(g.refunds).toEqual([]);
   });
 });
