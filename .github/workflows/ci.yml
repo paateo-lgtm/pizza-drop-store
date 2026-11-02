@@ -31,6 +31,8 @@ jobs:
       - run: npx prisma migrate deploy
       - run: npx prisma db seed
       - run: npm run lint
+      # PageProps/LayoutProps erzeugt Next erst; lokal liegen sie schon in .next
+      - run: npx next typegen
       - run: npm run typecheck
       - run: npm run format:check
       - run: npm test
