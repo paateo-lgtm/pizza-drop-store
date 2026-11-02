@@ -1,8 +1,8 @@
 name: Lockfile erneuern
 
 # Ein unter Windows erzeugtes package-lock.json lässt plattformabhängige optionale Pakete
-# weg (z. B. @emnapi/*); `npm ci` in der Linux-CI bricht dann ab. Dieser Workflow erzeugt
-# das Lockfile unter Linux neu und stellt es als Download bereit. Nach jeder Änderung an
+# weg (z. B. @emnapi/*); `npm ci` in der Linux-CI bricht dann ab. Dieser Workflow ergänzt
+# das Lockfile unter Linux und stellt es als Download bereit. Nach jeder Änderung an
 # den Abhängigkeiten von Hand starten, herunterladen, prüfen und committen:
 #   gh workflow run lockfile.yml
 #   gh run download --name package-lock
@@ -21,10 +21,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Lockfile unter Linux neu auflösen
-        run: |
-          rm -f package-lock.json
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      # Vom vorhandenen Lockfile aus: Versionen bleiben, nur Fehlendes kommt dazu.
+      # Ein komplett neues Lockfile würde nebenbei Abhängigkeiten anheben.
+      - name: Lockfile unter Linux ergänzen
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Prüfen, dass npm ci damit durchläuft
         run: npm ci --ignore-scripts --no-audit --no-fund
       - uses: actions/upload-artifact@v4
