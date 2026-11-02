@@ -62,6 +62,12 @@ test.describe("Reporting", () => {
       expect(body).toContain("Margherita");
       expect(body).not.toContain("Anna Rossi");
 
+      // Gewählter Drop bleibt in der Auswahl, auch außerhalb des Zeitraums
+      await page.goto(`/admin/reporting?drop=${drop.dropId}&bis=2020-01-01`);
+      await expect(page.getByLabel("Drop", { exact: true })).toHaveValue(
+        drop.dropId,
+      );
+
       await page.goto(`/admin/reporting/drops/${drop.dropId}`);
       await expect(
         page.getByRole("heading", { name: "Verkaufsverlauf" }),
@@ -69,6 +75,12 @@ test.describe("Reporting", () => {
       await expect(
         page.getByRole("img", { name: /Verkaufsverlauf: 1 von/ }),
       ).toBeVisible();
+      // Werte des Diagramms auch für Screenreader
+      await expect(
+        page
+          .getByRole("table", { name: "Verkaufsverlauf als Tabelle" })
+          .getByRole("cell", { name: "1", exact: true }),
+      ).toBeAttached();
     } finally {
       await drop.cleanup();
     }

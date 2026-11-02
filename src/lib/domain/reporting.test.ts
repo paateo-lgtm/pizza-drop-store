@@ -6,6 +6,7 @@ import {
   summarizeOrders,
   toCsv,
   topPizzas,
+  exportTable,
   type ReportOrder,
 } from "./reporting";
 
@@ -33,16 +34,31 @@ describe("summarizeOrders", () => {
     });
   });
 
-  it("zieht Erstattungen ab, die USt anteilig", () => {
+  it("zieht Erstattungen stornierter Bestellungen ab, die USt anteilig", () => {
     const kpis = summarizeOrders([
-      order({ status: "REFUNDED", refundedCents: 2380 }),
-      order({ refundedCents: 1190 }),
+      order({ status: "REFUNDED", refundedCents: 1190 }),
+      order({ status: "CANCELLED", refundedCents: 2380 }),
+      order(),
     ]);
-    expect(kpis.grossCents).toBe(1190);
-    expect(kpis.netCents).toBe(1000);
+    expect(kpis.grossCents).toBe(1190 + 2380);
+    expect(kpis.netCents).toBe(1000 + 2000);
     // Stornierte zählen weder als verkaufte Pizzen noch im Ø Bestellwert
     expect(kpis.pizzas).toBe(2);
-    expect(kpis.avgOrderCents).toBe(1190);
+    expect(kpis.avgOrderCents).toBe(2380);
+  });
+
+  it("Erstattung einer Doppelzahlung ändert den Umsatz nicht", () => {
+    // settle.ts erstattet die zweite Zahlung; die Bestellung bleibt bezahlt
+    const kpis = summarizeOrders([
+      order({ status: "PAID", refundedCents: 2380 }),
+    ]);
+    expect(kpis).toMatchObject({
+      grossCents: 2380,
+      netCents: 2000,
+      pizzas: 2,
+      avgOrderCents: 2380,
+      refundRate: 1,
+    });
   });
 
   it("berechnet Storno-, Erstattungs- und No-Show-Quote", () => {
@@ -203,5 +219,48 @@ describe("toCsv", () => {
     expect(toCsv([["=HYPERLINK(1)", "+1", "-x", "@SUM(A1)", -5]])).toBe(
       "﻿'=HYPERLINK(1);'+1;'-x;'@SUM(A1);-5\r\n",
     );
+  });
+});
+
+describe("exportTable", () => {
+  const base = {
+    number: 42,
+    dropTitle: "Freitags-Drop",
+    bakeStartsAt: new Date("2026-11-06T16:00:00Z"),
+    status: "PICKED_UP" as const,
+    paidAt: new Date("2026-11-05T17:05:00Z"),
+    discountCents: 0,
+    totalCents: 123450,
+    refundedCents: 0,
+  };
+
+  it("Bestellsummen nur in der ersten Zeile, damit Spaltensummen stimmen", () => {
+    const [header, first, second] = exportTable([
+      {
+        ...base,
+        items: [
+          { name: "Margherita", quantity: 2, unitPriceCents: 1050 },
+          { name: "Diavola", quantity: 1, unitPriceCents: 1290 },
+        ],
+      },
+    ]);
+    const sum = header.indexOf("Summe €");
+    expect(first[sum]).toBe("1234,50");
+    expect(second[sum]).toBeNull();
+    expect(second[0]).toBe(42);
+    expect(second).toContain("Diavola");
+    expect(first[header.indexOf("Backtag")]).toBe("06.11.2026");
+    expect(first[header.indexOf("Bezahlt")]).toBe("05.11.2026 18:05");
+  });
+
+  it("Beträge ohne Tausenderpunkt, Zeilensumme pro Position", () => {
+    const [header, row] = exportTable([
+      {
+        ...base,
+        items: [{ name: "Margherita", quantity: 2, unitPriceCents: 1050 }],
+      },
+    ]);
+    expect(row[header.indexOf("Einzelpreis €")]).toBe("10,50");
+    expect(row[header.indexOf("Zeilensumme €")]).toBe("21,00");
   });
 });

@@ -188,3 +188,26 @@ function csvField(value: string | number | null): string {
 export function toCsv(rows: (string | number | null)[][]): string {
   return "﻿" + rows.map((r) => r.map(csvField).join(";") + "\r\n").join("");
 }
+
+export type ExportOrder = {
+  number: number;
+  dropTitle: string;
+  bakeStartsAt: Date;
+  status: OrderStatus;
+  paidAt: Date;
+  discountCents: number;
+  totalCents: number;
+  refundedCents: number;
+  items: { name: string; quantity: number; unitPriceCents: number }[];
+};
+
+/**
+ * Tabelle für den CSV-Export: Kopfzeile plus eine Zeile pro Position. Bestellbeträge stehen
+ * nur in der ersten Zeile einer Bestellung, Beträge ohne Tausenderpunkt.
+ */
+export function exportTable(
+  orders: ExportOrder[],
+): (string | number | null)[][] {
+  void orders;
+  throw new Error("not implemented");
+}
