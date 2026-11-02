@@ -3,6 +3,7 @@ import { fixtures } from "../../../test/db-fixtures";
 import { feedbackKey } from "@/lib/booking/order-link";
 import { reserveOrder } from "@/lib/booking/reserve";
 import { db } from "@/lib/db";
+import { MAIL_FAILED } from "@/lib/mail/send";
 import {
   sendDueFeedbackRequests,
   submitFeedback,
@@ -166,6 +167,45 @@ describe("submitFeedback", () => {
     });
     expect(await send({})).toBe("closed");
     expect(await db.feedback.count({ where: { orderId: order.id } })).toBe(0);
+  });
+});
+
+describe("Review: Warteschlange und Eingaben", () => {
+  it("fragt neue Bestellungen vor solchen, deren Mail schon gescheitert ist", async () => {
+    // Gescheitert und älter: stünde nach Abholzeit vorn in der Schlange
+    const failing = await pickedUp(9, 71.5);
+    await db.emailLog.create({
+      data: {
+        kind: "feedback",
+        to: f.customer(9).email,
+        dedupeKey: `feedback:${failing.id}`,
+        providerId: MAIL_FAILED,
+      },
+    });
+    const fresh = await pickedUp(10, 4);
+    const r = requests();
+    await sendDueFeedbackRequests(new Date(), {
+      sendRequest: r.sendRequest,
+      limit: 1,
+    });
+    expect(r.for([failing.id, fresh.id]).map((m) => m.orderId)).toEqual([
+      fresh.id,
+    ]);
+  });
+
+  it("entfernt Nullzeichen aus dem Kommentar", async () => {
+    const order = await pickedUp(11, 4);
+    expect(
+      await submitFeedback({
+        orderId: order.id,
+        key: feedbackKey(order.id),
+        rating: 3,
+        comment: "gut\u0000 gemacht",
+      }),
+    ).toBe("saved");
+    expect(
+      await db.feedback.findUnique({ where: { orderId: order.id } }),
+    ).toMatchObject({ comment: "gut gemacht" });
   });
 });
 
