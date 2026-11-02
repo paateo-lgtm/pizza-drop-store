@@ -30,6 +30,7 @@ export default function LoginPage() {
 function LoginFormSkeleton() {
   return (
     <div
+      role="status"
       className="mt-8 flex flex-col gap-5"
       aria-busy="true"
       aria-label="Lädt"
