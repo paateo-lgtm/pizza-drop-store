@@ -174,7 +174,7 @@ async function reserveInTransaction(
     throw new Rejection({
       ok: false,
       conflict: false,
-      message: coupon.message,
+      message: "Bitte den Gutscheincode prüfen.",
       fieldErrors: { couponCode: [coupon.message] },
     });
   }
