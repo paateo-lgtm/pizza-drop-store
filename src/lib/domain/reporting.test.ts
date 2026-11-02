@@ -175,6 +175,11 @@ describe("parseReportFilter", () => {
       "cmabc123",
     );
   });
+
+  it("akzeptiert auch UUIDs als Drop-ID", () => {
+    const id = "3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b";
+    expect(parseReportFilter({ drop: id }).dropId).toBe(id);
+  });
 });
 
 describe("toCsv", () => {
