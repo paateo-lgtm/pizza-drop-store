@@ -139,7 +139,8 @@ export type ReportFilter = {
 };
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
-const ID = /^[a-z0-9]{1,40}$/;
+// IDs sind cuids, in Tests auch UUIDs
+const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 const first = (v: string | string[] | undefined) =>
   Array.isArray(v) ? v[0] : v;
