@@ -47,9 +47,7 @@ export function summarizeOrders(orders: ReportOrder[]): Kpis {
     // (zweites Geld rein und wieder raus) und ändern den Umsatz nicht.
     // chisle: bei Teilerstattungen auf aktive Bestellungen braucht Refund eine Art.
     const cancelledOrder = isCancelled(o.status);
-    const kept = cancelledOrder
-      ? o.totalCents - o.refundedCents
-      : o.totalCents;
+    const kept = cancelledOrder ? o.totalCents - o.refundedCents : o.totalCents;
     grossCents += kept;
     netCents +=
       kept -
