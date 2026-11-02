@@ -56,6 +56,7 @@ async function OrderDetail({
       drop: { select: { id: true, title: true } },
       slots: { orderBy: { seq: "asc" }, select: { seq: true, startsAt: true } },
       refunds: { orderBy: { createdAt: "asc" } },
+      coupon: { select: { id: true, code: true } },
     },
   });
   if (!order) notFound();
@@ -157,6 +158,26 @@ async function OrderDetail({
                 </li>
               ))}
             </ul>
+            {order.discountCents > 0 && (
+              <p className="flex justify-between pb-2.5 text-ink-muted">
+                <span>
+                  Gutschein{" "}
+                  {order.coupon ? (
+                    <Link
+                      href={`/admin/gutscheine/${order.coupon.id}`}
+                      className="font-mono underline underline-offset-4"
+                    >
+                      {order.coupon.code}
+                    </Link>
+                  ) : (
+                    "(gelöscht)"
+                  )}
+                </span>
+                <span className="tabular-nums">
+                  −{formatPrice(order.discountCents)}
+                </span>
+              </p>
+            )}
             <p className="flex justify-between border-t border-line pt-2.5 font-semibold">
               <span>Summe</span>
               <span className="tabular-nums">

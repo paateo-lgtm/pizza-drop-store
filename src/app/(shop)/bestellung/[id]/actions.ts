@@ -29,7 +29,11 @@ export async function startPayment(
   }
   const order = await db.order.findUnique({
     where: { id: orderId },
-    include: { items: true, customer: { select: { email: true } } },
+    include: {
+      items: true,
+      customer: { select: { email: true } },
+      coupon: { select: { code: true } },
+    },
   });
   if (!order || !canStartPayment(order.status, order.expiresAt, new Date())) {
     return {
@@ -43,8 +47,7 @@ export async function startPayment(
     (total, item) => total + item.quantity * item.unitPriceCents,
     0,
   );
-  if (sum !== order.totalCents) {
-    // Ab Gutscheinen (Phase 7) braucht es hier Rabatte; bis dahin ist das ein Fehler.
+  if (sum - order.discountCents !== order.totalCents) {
     console.error(
       `Positionen von Bestellung ${order.number} ergeben nicht die Summe`,
     );
@@ -66,6 +69,23 @@ export async function startPayment(
     } else if (existing?.status === "open" && existing.url) {
       url = existing.url;
     } else {
+      // Rabatt als einmaliger Stripe-Coupon über genau den Betrag der Bestellung: So zahlt
+      // der Kunde exakt totalCents, und der Webhook erkennt den Betrag wieder.
+      const discount =
+        order.discountCents > 0
+          ? await stripe.coupons.create(
+              {
+                amount_off: order.discountCents,
+                currency: "eur",
+                duration: "once",
+                max_redemptions: 1,
+                name: `Gutschein ${order.coupon?.code ?? ""}`
+                  .trim()
+                  .slice(0, 40),
+              },
+              { idempotencyKey: `coupon:${order.id}` },
+            )
+          : null;
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         locale: "de",
@@ -82,6 +102,7 @@ export async function startPayment(
             product_data: { name: item.nameSnapshot },
           },
         })),
+        discounts: discount ? [{ coupon: discount.id }] : undefined,
         success_url: `${back}&bezahlt=1`,
         cancel_url: back,
       });

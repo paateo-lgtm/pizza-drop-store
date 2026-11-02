@@ -133,6 +133,7 @@ export function OrderForm({
       phone: String(data.get("phone") ?? ""),
       note: String(data.get("note") ?? ""),
       feedbackConsent: data.get("feedbackConsent") === "on",
+      couponCode: String(data.get("couponCode") ?? ""),
     };
     startTransition(async () => {
       let state: ReserveState;
@@ -278,6 +279,26 @@ export function OrderForm({
                     maxLength={300}
                     aria-invalid={!!errors.note}
                     aria-describedby={errors.note ? "note-error" : undefined}
+                  />
+                </Field>
+                <Field
+                  label="Gutscheincode (optional)"
+                  name="couponCode"
+                  error={errors.couponCode}
+                  hint="Der Rabatt steht im nächsten Schritt, vor der Zahlung."
+                >
+                  <Input
+                    id="couponCode"
+                    name="couponCode"
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    maxLength={40}
+                    className="uppercase"
+                    aria-invalid={!!errors.couponCode}
+                    aria-describedby={
+                      errors.couponCode ? "couponCode-error" : "couponCode-hint"
+                    }
                   />
                 </Field>
                 <div className="flex items-start gap-3 text-sm sm:col-span-2">
@@ -633,7 +654,11 @@ function Field({
           {error[0]}
         </p>
       ) : (
-        hint && <p className="text-xs text-ink-muted">{hint}</p>
+        hint && (
+          <p id={`${name}-hint`} className="text-xs text-ink-muted">
+            {hint}
+          </p>
+        )
       )}
     </div>
   );

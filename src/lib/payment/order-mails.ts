@@ -72,10 +72,20 @@ export async function sendOrderNotice(notice: OrderNotice) {
       pickup: `${formatLongDate(order.pickupAt)}, ${formatTime(order.pickupAt)} Uhr`,
       location: order.drop.location,
       pickupCode: text.code ? order.pickupCode : null,
-      items: order.items.map((item) => ({
-        label: `${item.quantity} × ${item.nameSnapshot}`,
-        price: formatPrice(item.quantity * item.unitPriceCents),
-      })),
+      items: [
+        ...order.items.map((item) => ({
+          label: `${item.quantity} × ${item.nameSnapshot}`,
+          price: formatPrice(item.quantity * item.unitPriceCents),
+        })),
+        ...(order.discountCents > 0
+          ? [
+              {
+                label: "Gutschein",
+                price: `−${formatPrice(order.discountCents)}`,
+              },
+            ]
+          : []),
+      ],
       total: formatPrice(order.totalCents),
       link: `${appUrl()}${orderPath(order.id)}`,
       linkLabel: "Bestellung ansehen",

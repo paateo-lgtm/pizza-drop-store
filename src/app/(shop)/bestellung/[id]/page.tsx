@@ -247,6 +247,14 @@ async function OrderContent({
           ))}
         </ul>
         <dl className="mt-4 grid grid-cols-2 gap-y-1 text-sm">
+          {order.discountCents > 0 && (
+            <>
+              <dt className="text-ink-muted">Gutschein</dt>
+              <dd className="text-right text-olive tabular-nums">
+                −{formatPrice(order.discountCents)}
+              </dd>
+            </>
+          )}
           <dt className="font-medium">Summe</dt>
           <dd className="text-right text-base font-semibold tabular-nums">
             {formatPrice(order.totalCents)}
