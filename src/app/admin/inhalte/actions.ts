@@ -62,7 +62,15 @@ export async function saveContentForm(
   if (!parsed.success) return toFormState(parsed.error);
 
   const before = await getContent(key);
-  await saveContent(key, parsed.data as Content[typeof key]);
+  try {
+    await saveContent(key, parsed.data as Content[typeof key]);
+  } catch (error) {
+    console.error(`Inhalt ${key} konnte nicht gespeichert werden`, error);
+    return {
+      ok: false,
+      message: "Speichern hat nicht geklappt. Bitte gleich noch einmal.",
+    };
+  }
   await audit({
     userId: user.id,
     action: "update",

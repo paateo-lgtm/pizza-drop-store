@@ -1,10 +1,10 @@
 import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
-import { appUrl } from "@/lib/payment/order-mails";
+import { siteUrl } from "@/lib/site-url";
 
 /** Startseite, kommende Drops und die festen Seiten. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = appUrl();
+  const base = siteUrl();
   const drops = await db.drop.findMany({
     where: {
       status: { notIn: ["DRAFT", "CANCELLED", "COMPLETED"] },

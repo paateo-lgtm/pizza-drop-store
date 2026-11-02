@@ -1,4 +1,4 @@
-import { ArrowRight, MapPin } from "lucide-react";
+import { ArrowRight, ChevronDown, MapPin } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
@@ -75,8 +75,13 @@ async function Sections() {
           <div className="mt-8 max-w-3xl divide-y divide-line border-y border-line">
             {faq.map((item, i) => (
               <details key={i} className="group py-4">
-                <summary className="cursor-pointer list-none text-xl group-open:text-olive marker:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-sm text-xl group-open:text-olive marker:hidden focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none">
                   {item.question}
+                  {/* Auf/Zu nicht nur über die Farbe zeigen (WCAG 1.4.1) */}
+                  <ChevronDown
+                    className="size-5 shrink-0 transition-transform group-open:rotate-180"
+                    aria-hidden
+                  />
                 </summary>
                 <p className="mt-3 whitespace-pre-line text-ink-muted">
                   {item.answer}

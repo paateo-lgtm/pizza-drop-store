@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, DM_Sans } from "next/font/google";
-import { appUrl } from "@/lib/payment/order-mails";
+import { siteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -19,7 +19,7 @@ const description =
   "Pizza-Drops zum Vorbestellen: Abholzeit sichern, online bezahlen, frisch aus dem Ofen abholen.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(appUrl()),
+  metadataBase: new URL(siteUrl()),
   title: {
     default: "Pizza Drop",
     template: "%s · Pizza Drop",

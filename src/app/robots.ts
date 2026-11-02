@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { appUrl } from "@/lib/payment/order-mails";
+import { siteUrl } from "@/lib/site-url";
 
 /** Persönliche Links (Bestellung, Feedback, Alarm, Warteliste) und Team-Bereiche nicht indexieren. */
 export default function robots(): MetadataRoute.Robots {
@@ -18,6 +18,6 @@ export default function robots(): MetadataRoute.Robots {
         "/warteliste/",
       ],
     },
-    sitemap: `${appUrl()}/sitemap.xml`,
+    sitemap: `${siteUrl()}/sitemap.xml`,
   };
 }

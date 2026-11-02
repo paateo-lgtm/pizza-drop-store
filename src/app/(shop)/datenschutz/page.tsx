@@ -66,16 +66,25 @@ async function Privacy() {
         Vertrags (Art. 6 Abs. 1 lit. b DSGVO).
       </p>
       <p>
+        Zu deiner E-Mail-Adresse legen wir einen Kundendatensatz an (Name,
+        Telefon, Zeitpunkt der ersten Bestellung), den weitere Bestellungen mit
+        derselben Adresse wiederverwenden. Name und Telefon einer Bestellung
+        stehen zusätzlich an der Bestellung selbst.
+      </p>
+      <p>
         Bestelldaten bewahren wir auf, solange handels- und steuerrechtliche
-        Pflichten es verlangen (bis zu zehn Jahre, § 147 AO, § 257 HGB).
+        Pflichten es verlangen (bis zu zehn Jahre, § 147 AO, § 257 HGB). Eine
+        frühere Löschung des Kundendatensatzes kannst du jederzeit verlangen,
+        soweit keine Aufbewahrungspflicht entgegensteht.
       </p>
 
       <h2>5. Zahlung über Stripe</h2>
       <p>
         Die Zahlung wickelt Stripe Payments Europe, Ltd. (Irland) ab. Dafür
-        geben wir Bestellnummer, Betrag und deine E-Mail-Adresse weiter. Karten-
-        und Kontodaten gibst du direkt bei Stripe ein; wir erhalten sie nicht.
-        Bei uns gespeichert werden nur die Kennungen der Zahlung, um sie
+        geben wir deine E-Mail-Adresse, eine interne Kennung der Bestellung, die
+        bestellten Pizzen mit Preisen und einen eingelösten Rabatt weiter.
+        Karten- und Kontodaten gibst du direkt bei Stripe ein; wir erhalten sie
+        nicht. Bei uns gespeichert werden nur die Kennungen der Zahlung, um sie
         zuordnen und gegebenenfalls erstatten zu können. Rechtsgrundlage ist
         Art. 6 Abs. 1 lit. b DSGVO. Stripe kann Daten auch in den USA
         verarbeiten; die Übermittlung stützt sich auf das EU-US Data Privacy
@@ -97,7 +106,9 @@ async function Privacy() {
         den Zeitpunkt der Anmeldung und der Bestätigung sowie die Version des
         Einwilligungstexts als Nachweis. Rechtsgrundlage ist deine Einwilligung
         (Art. 6 Abs. 1 lit. a DSGVO). Du kannst sie jederzeit über den Link in
-        jeder Mail widerrufen; danach schreiben wir dir nicht mehr.
+        jeder Mail widerrufen; danach schreiben wir dir nicht mehr. Adresse und
+        Zeitpunkt des Widerrufs behalten wir als Nachweis, dass wir ihn
+        beachten; auf Wunsch löschen wir sie vollständig.
       </p>
 
       <h2>8. Warteliste</h2>
@@ -116,7 +127,8 @@ async function Privacy() {
         dein Kommentar werden mit der Bestellung gespeichert und intern
         ausgewertet; wir veröffentlichen sie nicht. Rechtsgrundlage ist deine
         Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Du kannst ihr jederzeit über
-        den Link in der Mail widersprechen.
+        den Link in der Mail widersprechen. Eine abgegebene Bewertung bleibt mit
+        der Bestellung gespeichert; auf Wunsch löschen wir sie.
       </p>
 
       <h2>10. Versand von E-Mails</h2>
@@ -125,7 +137,9 @@ async function Privacy() {
         übermitteln wir Empfängeradresse und Inhalt der Mail. Die Übermittlung
         in die USA stützt sich auf Standardvertragsklauseln. Wir protokollieren,
         welche Mail an welche Adresse ging, um Doppelversand zu vermeiden und
-        den Versand nachweisen zu können (Art. 6 Abs. 1 lit. f DSGVO).
+        den Versand nachweisen zu können (Art. 6 Abs. 1 lit. f DSGVO). Das
+        Protokoll enthält nur Art, Empfängeradresse und Zeitpunkt, nicht den
+        Inhalt der Mail.
       </p>
 
       <h2>11. Hosting und Datenbank</h2>
@@ -142,7 +156,9 @@ async function Privacy() {
       <p>
         Für Kundinnen und Kunden setzen wir keine Cookies. Nur unser Team erhält
         beim Anmelden im Verwaltungsbereich ein technisch notwendiges
-        Sitzungs-Cookie (§ 25 Abs. 2 TDDDG).
+        Sitzungs-Cookie (§ 25 Abs. 2 TDDDG). Auf den Geräten in der Küche merkt
+        sich der Browser, welche Zutaten auf der Vorbereitungsliste abgehakt
+        sind; dabei werden keine personenbezogenen Daten gespeichert.
       </p>
 
       <h2>13. Deine Rechte</h2>
