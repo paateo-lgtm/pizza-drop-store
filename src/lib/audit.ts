@@ -18,7 +18,14 @@ type AuditEntry = {
     | "unblock"
     | "cancel";
   entity:
-    "pizza" | "ingredient" | "settings" | "user" | "drop" | "order" | "coupon";
+    | "pizza"
+    | "ingredient"
+    | "settings"
+    | "user"
+    | "drop"
+    | "order"
+    | "coupon"
+    | "content";
   entityId?: string;
   diff?: Prisma.InputJsonValue;
 };

@@ -5,6 +5,7 @@ import {
   CalendarClock,
   ChefHat,
   ClipboardList,
+  FileText,
   History,
   LayoutDashboard,
   MessageSquareText,
@@ -63,6 +64,7 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
   {
     title: "Verwaltung",
     items: [
+      { href: "/admin/inhalte", label: "Inhalte & Recht", icon: FileText },
       { href: "/admin/einstellungen", label: "Einstellungen", icon: Settings },
       { href: "/admin/team", label: "Team", icon: Users },
       { href: "/admin/protokoll", label: "Protokoll", icon: History },

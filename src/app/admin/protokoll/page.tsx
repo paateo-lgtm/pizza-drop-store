@@ -28,6 +28,7 @@ const ENTITIES: Record<string, string> = {
   drop: "Drop",
   order: "Bestellung",
   coupon: "Gutschein",
+  content: "Inhalte",
 };
 
 const dateTime = new Intl.DateTimeFormat("de-DE", {
