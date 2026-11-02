@@ -2,6 +2,8 @@
  * Kennzahlen fürs Reporting (Phase 8). Reine Funktionen; die Daten lädt `lib/reporting`.
  * chisle: Aggregation in TypeScript, bei Shop-Volumen ausreichend; in SQL verlagern, wenn es wächst.
  */
+import { TZDate } from "@date-fns/tz";
+import { TIME_ZONE } from "@/lib/time";
 import type { OrderStatus, SlotStatus } from "./drops";
 
 /** Bezahlte Bestellung (paidAt gesetzt) mit Erstattungen und Stückzahl */
@@ -24,9 +26,46 @@ export type Kpis = {
   noShowRate: number;
 };
 
+/** Nach der Zahlung storniert (Admin-Storno oder späte Zahlung) */
+export const isCancelled = (status: OrderStatus) =>
+  status === "CANCELLED" || status === "REFUNDED";
+
+const ratio = (part: number, whole: number) => (whole === 0 ? 0 : part / whole);
+
 export function summarizeOrders(orders: ReportOrder[]): Kpis {
-  void orders;
-  throw new Error("not implemented");
+  let pizzas = 0;
+  let grossCents = 0;
+  let netCents = 0;
+  let cancelled = 0;
+  let refunded = 0;
+  let pickedUp = 0;
+  let noShow = 0;
+  for (const o of orders) {
+    const kept = o.totalCents - o.refundedCents;
+    grossCents += kept;
+    netCents +=
+      kept -
+      (o.totalCents === 0 ? 0 : Math.round((o.vatCents * kept) / o.totalCents));
+    if (o.refundedCents > 0) refunded++;
+    if (isCancelled(o.status)) {
+      cancelled++;
+      continue;
+    }
+    pizzas += o.pizzas;
+    if (o.status === "PICKED_UP") pickedUp++;
+    if (o.status === "NO_SHOW") noShow++;
+  }
+  const kept = orders.length - cancelled;
+  return {
+    orders: orders.length,
+    pizzas,
+    grossCents,
+    netCents,
+    avgOrderCents: kept === 0 ? 0 : Math.round(grossCents / kept),
+    cancelRate: ratio(cancelled, orders.length),
+    refundRate: ratio(refunded, orders.length),
+    noShowRate: ratio(noShow, pickedUp + noShow),
+  };
 }
 
 export type SlotUsage = Record<SlotStatus, number> & {
@@ -36,8 +75,12 @@ export type SlotUsage = Record<SlotStatus, number> & {
 
 /** Slots je Anzeige-Zustand (aus `slotStatus`) und Auslastung */
 export function slotUsage(statuses: SlotStatus[]): SlotUsage {
-  void statuses;
-  throw new Error("not implemented");
+  const count = { sold: 0, reserved: 0, blocked: 0, free: 0 };
+  for (const s of statuses) count[s]++;
+  return {
+    ...count,
+    utilization: ratio(count.sold, statuses.length - count.blocked),
+  };
 }
 
 export type SalesPoint = { at: Date; pizzas: number };
@@ -51,10 +94,17 @@ export function salesCurve(
   capacity: number,
   paid: { paidAt: Date; pizzas: number }[],
 ): { points: SalesPoint[]; soldOutAfterMs: number | null } {
-  void saleStartsAt;
-  void capacity;
-  void paid;
-  throw new Error("not implemented");
+  const points: SalesPoint[] = [{ at: saleStartsAt, pizzas: 0 }];
+  let soldOutAfterMs: number | null = null;
+  let total = 0;
+  for (const p of [...paid].sort((a, b) => +a.paidAt - +b.paidAt)) {
+    total += p.pizzas;
+    points.push({ at: p.paidAt, pizzas: total });
+    if (soldOutAfterMs === null && capacity > 0 && total >= capacity) {
+      soldOutAfterMs = +p.paidAt - +saleStartsAt;
+    }
+  }
+  return { points, soldOutAfterMs };
 }
 
 export type PizzaRow = {
@@ -68,8 +118,18 @@ export type PizzaRow = {
 export function topPizzas(
   items: { name: string; quantity: number; unitPriceCents: number }[],
 ): PizzaRow[] {
-  void items;
-  throw new Error("not implemented");
+  const byName = new Map<string, { quantity: number; revenueCents: number }>();
+  let total = 0;
+  for (const i of items) {
+    const row = byName.get(i.name) ?? { quantity: 0, revenueCents: 0 };
+    row.quantity += i.quantity;
+    row.revenueCents += i.quantity * i.unitPriceCents;
+    byName.set(i.name, row);
+    total += i.quantity;
+  }
+  return [...byName]
+    .map(([name, r]) => ({ name, ...r, share: ratio(r.quantity, total) }))
+    .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
 }
 
 export type ReportFilter = {
@@ -77,6 +137,22 @@ export type ReportFilter = {
   to: Date | null;
   dropId: string | null;
 };
+
+const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+const ID = /^[a-z0-9]{1,40}$/;
+
+const first = (v: string | string[] | undefined) =>
+  Array.isArray(v) ? v[0] : v;
+
+/** Beginn eines Berliner Kalendertags; `plusDays` verschiebt um ganze Tage */
+function berlinDay(value: string | undefined, plusDays = 0): Date | null {
+  const match = value ? DAY.exec(value) : null;
+  if (!match) return null;
+  const [y, m, d] = match.slice(1).map(Number);
+  const check = new Date(Date.UTC(y, m - 1, d));
+  if (check.getUTCMonth() !== m - 1 || check.getUTCDate() !== d) return null;
+  return new Date(new TZDate(y, m - 1, d + plusDays, TIME_ZONE).getTime());
+}
 
 /**
  * Filter aus der URL: `von`/`bis` als Berliner Kalendertag (YYYY-MM-DD), `drop` als ID.
@@ -87,8 +163,21 @@ export function parseReportFilter(params: {
   bis?: string | string[];
   drop?: string | string[];
 }): ReportFilter {
-  void params;
-  throw new Error("not implemented");
+  const drop = first(params.drop);
+  return {
+    from: berlinDay(first(params.von)),
+    to: berlinDay(first(params.bis), 1),
+    dropId: drop && ID.test(drop) ? drop : null,
+  };
+}
+
+const FORMULA = /^[=+\-@\t\r]/;
+
+function csvField(value: string | number | null): string {
+  if (value === null) return "";
+  if (typeof value === "number") return String(value);
+  const safe = FORMULA.test(value) ? `'${value}` : value;
+  return /[;"\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
 /**
@@ -96,6 +185,5 @@ export function parseReportFilter(params: {
  * bekommen ein Hochkomma vorangestellt (Schutz vor Formel-Injektion).
  */
 export function toCsv(rows: (string | number | null)[][]): string {
-  void rows;
-  throw new Error("not implemented");
+  return "﻿" + rows.map((r) => r.map(csvField).join(";") + "\r\n").join("");
 }

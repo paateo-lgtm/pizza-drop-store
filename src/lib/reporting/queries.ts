@@ -1,17 +1,83 @@
 import "server-only";
-import type {
-  Kpis,
-  PizzaRow,
-  ReportFilter,
-  SalesPoint,
+import type { Prisma } from "@/generated/prisma/client";
+import { db } from "@/lib/db";
+import {
+  isCancelled,
+  salesCurve,
+  summarizeOrders,
+  topPizzas,
+  type Kpis,
+  type PizzaRow,
+  type ReportFilter,
+  type SalesPoint,
 } from "@/lib/domain/reporting";
+import { TIME_ZONE } from "@/lib/time";
 
 export type Report = { kpis: Kpis; pizzas: PizzaRow[] };
 
+/** Bezahlte Bestellungen im Filter; der Zeitraum gilt für den Backtag des Drops */
+function paidOrdersWhere(filter: ReportFilter): Prisma.OrderWhereInput {
+  return {
+    paidAt: { not: null },
+    ...(filter.dropId && { dropId: filter.dropId }),
+    ...((filter.from || filter.to) && {
+      drop: {
+        bakeStartsAt: {
+          ...(filter.from && { gte: filter.from }),
+          ...(filter.to && { lt: filter.to }),
+        },
+      },
+    }),
+  };
+}
+
+const ORDER_SELECT = {
+  status: true,
+  totalCents: true,
+  vatCents: true,
+  paidAt: true,
+  refunds: { select: { amountCents: true } },
+  items: {
+    select: { nameSnapshot: true, quantity: true, unitPriceCents: true },
+  },
+} satisfies Prisma.OrderSelect;
+
+type LoadedOrder = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
+
+const pizzaCount = (o: LoadedOrder) =>
+  o.items.reduce((s, i) => s + i.quantity, 0);
+
+function toReport(orders: LoadedOrder[]): Report {
+  const kpis = summarizeOrders(
+    orders.map((o) => ({
+      status: o.status,
+      totalCents: o.totalCents,
+      vatCents: o.vatCents,
+      refundedCents: o.refunds.reduce((s, r) => s + r.amountCents, 0),
+      pizzas: pizzaCount(o),
+    })),
+  );
+  const pizzas = topPizzas(
+    orders
+      .filter((o) => !isCancelled(o.status))
+      .flatMap((o) =>
+        o.items.map((i) => ({
+          name: i.nameSnapshot,
+          quantity: i.quantity,
+          unitPriceCents: i.unitPriceCents,
+        })),
+      ),
+  );
+  return { kpis, pizzas };
+}
+
 /** KPIs und Pizzen über alle bezahlten Bestellungen im Filter (Zeitraum = Backtag des Drops) */
 export async function loadReport(filter: ReportFilter): Promise<Report> {
-  void filter;
-  throw new Error("not implemented");
+  const orders = await db.order.findMany({
+    where: paidOrdersWhere(filter),
+    select: ORDER_SELECT,
+  });
+  return toReport(orders);
 }
 
 export type DropReport = Report & {
@@ -24,14 +90,84 @@ export type DropReport = Report & {
 export async function loadDropReport(
   dropId: string,
 ): Promise<DropReport | null> {
-  void dropId;
-  throw new Error("not implemented");
+  const drop = await db.drop.findUnique({
+    where: { id: dropId },
+    select: { id: true, title: true, bakeStartsAt: true, saleStartsAt: true },
+  });
+  if (!drop) return null;
+  const [orders, capacity] = await Promise.all([
+    db.order.findMany({
+      where: paidOrdersWhere({ from: null, to: null, dropId }),
+      select: ORDER_SELECT,
+    }),
+    db.slot.count({ where: { dropId, state: "FREE" } }),
+  ]);
+  const curve = salesCurve(
+    drop.saleStartsAt,
+    capacity,
+    orders
+      .filter((o) => !isCancelled(o.status))
+      .map((o) => ({ paidAt: o.paidAt!, pizzas: pizzaCount(o) })),
+  );
+  return { drop, ...toReport(orders), ...curve };
 }
+
+const day = new Intl.DateTimeFormat("de-DE", {
+  timeZone: TIME_ZONE,
+  dateStyle: "medium",
+});
+const dateTime = new Intl.DateTimeFormat("de-DE", {
+  timeZone: TIME_ZONE,
+  dateStyle: "short",
+  timeStyle: "short",
+});
+const euro = (cents: number) =>
+  (cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 });
 
 /** CSV-Zeilen: eine Zeile pro Bestellposition, ohne Kontaktdaten */
 export async function exportRows(
   filter: ReportFilter,
 ): Promise<(string | number | null)[][]> {
-  void filter;
-  throw new Error("not implemented");
+  const orders = await db.order.findMany({
+    where: paidOrdersWhere(filter),
+    orderBy: { number: "asc" },
+    select: {
+      ...ORDER_SELECT,
+      number: true,
+      discountCents: true,
+      drop: { select: { title: true, bakeStartsAt: true } },
+    },
+  });
+  const header = [
+    "Bestellung",
+    "Drop",
+    "Backtag",
+    "Status",
+    "Bezahlt",
+    "Pizza",
+    "Menge",
+    "Einzelpreis €",
+    "Rabatt €",
+    "Summe €",
+    "Erstattet €",
+  ];
+  return [
+    header,
+    ...orders.flatMap((o) => {
+      const refunded = o.refunds.reduce((s, r) => s + r.amountCents, 0);
+      return o.items.map((i) => [
+        o.number,
+        o.drop.title,
+        day.format(o.drop.bakeStartsAt),
+        o.status,
+        dateTime.format(o.paidAt!),
+        i.nameSnapshot,
+        i.quantity,
+        euro(i.unitPriceCents),
+        euro(o.discountCents),
+        euro(o.totalCents),
+        euro(refunded),
+      ]);
+    }),
+  ];
 }
