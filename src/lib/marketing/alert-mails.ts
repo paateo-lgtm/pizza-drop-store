@@ -10,6 +10,7 @@ import {
   type AlertMail,
   type ConfirmMail,
 } from "./drop-alert";
+import type { FeedbackRequest } from "./feedback";
 import type { WaitlistNotice } from "./waitlist";
 
 /** Kein Zeilenumbruch aus Admin-Texten in Kopfzeilen wie dem Betreff */
@@ -59,6 +60,31 @@ export function sendWaitlistMail(mail: WaitlistNotice) {
       unsubscribeLabel: "Von der Warteliste austragen",
       footer:
         "Du bekommst diese Mail, weil du dich für diesen Drop auf die Warteliste gesetzt hast.",
+    }),
+  });
+}
+
+export function sendFeedbackMail(mail: FeedbackRequest) {
+  const url = `${appUrl()}${mail.feedbackPath}`;
+  const [path, query] = mail.feedbackPath.split("?");
+  return sendMail({
+    kind: "feedback",
+    to: mail.to,
+    dedupeKey: mail.dedupeKey,
+    subject: `Wie war deine Pizza? · Nr. ${mail.orderNumber}`,
+    react: createElement(NoticeMail, {
+      preview: "Ein Klick auf die Sterne genügt.",
+      heading: "Wie hat es dir geschmeckt?",
+      paragraphs: [
+        `Danke, dass du beim Drop „${mail.dropTitle}“ dabei warst. Wir backen jedes Mal ein bisschen besser – sag uns kurz, wie deine Pizza war.`,
+        "Das dauert keine Minute: 1 bis 5 Sterne und, wenn du magst, ein Satz dazu.",
+      ],
+      link: url,
+      linkLabel: "Jetzt bewerten",
+      unsubscribeUrl: `${appUrl()}${path}/abmelden?${query}`,
+      unsubscribeLabel: "Keine Feedback-Anfragen mehr",
+      footer:
+        "Du bekommst diese Mail einmalig, weil du beim Bestellen um eine Bewertungsanfrage gebeten hast.",
     }),
   });
 }

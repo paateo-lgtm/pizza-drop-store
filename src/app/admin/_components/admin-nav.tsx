@@ -7,6 +7,7 @@ import {
   ClipboardList,
   History,
   LayoutDashboard,
+  MessageSquareText,
   Pizza,
   Settings,
   TicketPercent,
@@ -56,6 +57,7 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
         icon: BarChart3,
         phase: 8,
       },
+      { href: "/admin/feedback", label: "Feedback", icon: MessageSquareText },
     ],
   },
   {

@@ -37,6 +37,11 @@ const nextConfig: NextConfig = {
         source: "/warteliste/:path*",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
+      {
+        // Und im persönlichen Feedback-Link (?k=)
+        source: "/feedback/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
     ];
   },
   partialPrefetching: true,

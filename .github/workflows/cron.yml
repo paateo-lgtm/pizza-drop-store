@@ -1,7 +1,7 @@
 name: Cron
 
 # Ruft die Cron-Endpunkte der Live-Seite auf (Drop-Alarm zum Verkaufsstart, Warteliste,
-# später Feedback, Aufräumen). GitHub startet geplante Läufe teils mit einigen
+# Feedback, später Aufräumen). GitHub startet geplante Läufe teils mit einigen
 # Minuten Verzögerung. Bei einem Wechsel zu Vercel Pro übernimmt vercel.json die Aufgabe.
 on:
   schedule:
@@ -42,3 +42,10 @@ jobs:
             --retry 3 --retry-all-errors --retry-delay 10 \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$APP_URL/api/cron/warteliste"
+      - name: Feedback
+        if: ${{ !cancelled() && env.CRON_SECRET != '' }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            --retry 3 --retry-all-errors --retry-delay 10 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/feedback"
