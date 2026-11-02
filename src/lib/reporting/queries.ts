@@ -86,22 +86,30 @@ export type DropReport = Report & {
   soldOutAfterMs: number | null;
 };
 
-/** Bericht zu einem Drop; Kapazität = Slots ohne Sperre */
+/** Bericht zu einem Drop; Kapazität = Slots ohne Sperre, höchstens `maxPizzasTotal` */
 export async function loadDropReport(
   dropId: string,
 ): Promise<DropReport | null> {
-  const drop = await db.drop.findUnique({
+  const found = await db.drop.findUnique({
     where: { id: dropId },
-    select: { id: true, title: true, bakeStartsAt: true, saleStartsAt: true },
+    select: {
+      id: true,
+      title: true,
+      bakeStartsAt: true,
+      saleStartsAt: true,
+      maxPizzasTotal: true,
+    },
   });
-  if (!drop) return null;
-  const [orders, capacity] = await Promise.all([
+  if (!found) return null;
+  const { maxPizzasTotal, ...drop } = found;
+  const [orders, openSlots] = await Promise.all([
     db.order.findMany({
       where: paidOrdersWhere({ from: null, to: null, dropId }),
       select: ORDER_SELECT,
     }),
     db.slot.count({ where: { dropId, state: "FREE" } }),
   ]);
+  const capacity = Math.min(openSlots, maxPizzasTotal ?? Infinity);
   const curve = salesCurve(
     drop.saleStartsAt,
     capacity,
