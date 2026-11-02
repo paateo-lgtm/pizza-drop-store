@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseBerlinLocal } from "@/lib/time";
 
 /** "10,50", "10.5" oder "10" → Cent. Nur positive Beträge mit höchstens zwei Nachkommastellen. */
 export function parseEuroToCents(input: string): number | null {
@@ -35,6 +36,31 @@ export const euroField = z.string().transform((value, ctx) => {
   }
   return cents;
 });
+
+/** Datum und Uhrzeit aus einem datetime-local-Feld, gelesen als Berliner Zeit. */
+export const localDateTime = z.string().transform((value, ctx) => {
+  const date = parseBerlinLocal(value);
+  if (!date) {
+    ctx.addIssue({ code: "custom", message: "Bitte Datum und Uhrzeit wählen" });
+    return z.NEVER;
+  }
+  return date;
+});
+
+/** Leeres Feld → null, sonst ganze Zahl im Bereich. */
+export const optionalInt = (min: number, max: number, message: string) =>
+  z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? null : Number(v)))
+    .pipe(
+      z
+        .number({ error: message })
+        .int(message)
+        .min(min, message)
+        .max(max, message)
+        .nullable(),
+    );
 
 /** Formular-Checkbox/Switch: "on" bzw. "true" → true, fehlend → false. */
 export const checkboxField = z

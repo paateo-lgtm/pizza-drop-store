@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeCouponCode } from "@/lib/domain/coupon";
 
 const optionalText = (max: number, message: string) =>
   z
@@ -51,6 +52,11 @@ export const reservationSchema = z.object({
     ),
   note: optionalText(300, "Die Notiz darf höchstens 300 Zeichen haben."),
   feedbackConsent: z.boolean().default(false),
+  couponCode: z
+    .string()
+    .max(40, "Diesen Gutscheincode kennen wir nicht.")
+    .optional()
+    .transform((v) => (v ? normalizeCouponCode(v) || null : null)),
 });
 
 export type ReservationInput = z.infer<typeof reservationSchema>;

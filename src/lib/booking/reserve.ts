@@ -16,6 +16,7 @@ import {
   type ReservationInput,
 } from "@/lib/validation/booking";
 import { loadAvailability } from "./availability";
+import { redeemCoupon } from "./coupon";
 
 export type ReserveResult =
   | { ok: true; orderId: string }
@@ -161,6 +162,23 @@ async function reserveInTransaction(
     });
   }
 
+  const coupon = input.couponCode
+    ? await redeemCoupon(tx, input.couponCode, {
+        dropId: drop.id,
+        now,
+        subtotalCents: cart.subtotalCents,
+        customerId: existing?.id ?? null,
+      })
+    : null;
+  if (coupon && !coupon.ok) {
+    throw new Rejection({
+      ok: false,
+      conflict: false,
+      message: coupon.message,
+      fieldErrors: { couponCode: [coupon.message] },
+    });
+  }
+
   // Ein bestehender Kunde wird nie überschrieben: Wer nur die E-Mail kennt, darf Name und
   // Telefon eines anderen nicht ändern. Der Kontakt dieser Bestellung steht an der Order.
   const customer =
@@ -175,7 +193,11 @@ async function reserveInTransaction(
   const expiresAt = new Date(
     now.getTime() + settings.reservationMinutes * 60_000,
   );
-  const prices = priceBreakdown(cart.subtotalCents, 0, settings.vatRatePercent);
+  const prices = priceBreakdown(
+    cart.subtotalCents,
+    coupon?.ok ? coupon.discountCents : 0,
+    settings.vatRatePercent,
+  );
   const order = await tx.order.create({
     data: {
       dropId: drop.id,
@@ -187,6 +209,7 @@ async function reserveInTransaction(
       pickupCode: generatePickupCode(),
       note: input.note,
       feedbackConsent: input.feedbackConsent,
+      couponId: coupon?.ok ? coupon.couponId : null,
       expiresAt,
       items: {
         create: cart.items.map((item) => ({

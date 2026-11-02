@@ -1,31 +1,6 @@
 import { z } from "zod";
 import { validateDropTimes } from "@/lib/domain/drops";
-import { parseBerlinLocal } from "@/lib/time";
-import { euroField, slugify } from "./common";
-
-const localDateTime = z.string().transform((value, ctx) => {
-  const date = parseBerlinLocal(value);
-  if (!date) {
-    ctx.addIssue({ code: "custom", message: "Bitte Datum und Uhrzeit wählen" });
-    return z.NEVER;
-  }
-  return date;
-});
-
-/** Leeres Feld → null, sonst ganze Zahl im Bereich. */
-const optionalInt = (min: number, max: number, message: string) =>
-  z
-    .string()
-    .trim()
-    .transform((v) => (v === "" ? null : Number(v)))
-    .pipe(
-      z
-        .number({ error: message })
-        .int(message)
-        .min(min, message)
-        .max(max, message)
-        .nullable(),
-    );
+import { euroField, localDateTime, optionalInt, slugify } from "./common";
 
 const pizzaRow = z.object({
   pizzaId: z.string().min(1),

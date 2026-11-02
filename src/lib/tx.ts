@@ -14,6 +14,18 @@ export async function lockDrop(tx: Prisma.TransactionClient, dropId: string) {
 }
 
 /**
+ * Einlösungen eines Gutscheins laufen nacheinander, auch über verschiedene Drops: Die
+ * Grenzen (gesamt, pro Kunde) werden erst nach dieser Sperre gezählt. Immer nach
+ * lockDrop() aufrufen, damit die Reihenfolge der Sperren überall gleich ist.
+ */
+export async function lockCoupon(
+  tx: Prisma.TransactionClient,
+  couponId: string,
+) {
+  await tx.$queryRaw`SELECT id FROM "Coupon" WHERE id = ${couponId} FOR UPDATE`;
+}
+
+/**
  * Kurzzeitig belegt – erneut versuchen hilft: keine Verbindung frei (P2024),
  * Transaktion zu lang (P2028), Schreibkonflikt (P2034). Alles andere ist ein echter Fehler.
  */
