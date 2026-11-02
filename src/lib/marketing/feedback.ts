@@ -61,22 +61,28 @@ export async function sendDueFeedbackRequests(
       drop: { select: { title: true } },
     },
   });
-  // Erledigt oder gerade in Arbeit; gescheiterte bzw. übersprungene zählen nicht.
-  const done = await db.emailLog.findMany({
-    where: {
-      dedupeKey: { in: candidates.map((o) => feedbackMailKey(o.id)) },
-      OR: [
-        { providerId: null },
-        { providerId: { notIn: [MAIL_FAILED, MAIL_SKIPPED] } },
-      ],
-    },
-    select: { dedupeKey: true },
+  const logs = await db.emailLog.findMany({
+    where: { dedupeKey: { in: candidates.map((o) => feedbackMailKey(o.id)) } },
+    select: { dedupeKey: true, providerId: true },
   });
-  const doneKeys = new Set(done.map((d) => d.dedupeKey));
+  const retry = (p: string | null) => p === MAIL_FAILED || p === MAIL_SKIPPED;
+  // Erledigt oder gerade in Arbeit; gescheiterte bzw. übersprungene zählen nicht.
+  const doneKeys = new Set(
+    logs.filter((l) => !retry(l.providerId)).map((l) => l.dedupeKey),
+  );
+  const retryKeys = new Set(
+    logs.filter((l) => retry(l.providerId)).map((l) => l.dedupeKey),
+  );
+  // Neue zuerst: Dauerhaft abgelehnte Adressen dürfen das Limit nicht aufbrauchen.
+  const queue = [...candidates].sort(
+    (a, b) =>
+      Number(retryKeys.has(feedbackMailKey(a.id))) -
+      Number(retryKeys.has(feedbackMailKey(b.id))),
+  );
 
   const run: AlertRun = { sent: 0, skipped: 0, failed: 0, remaining: 0 };
   let attempts = 0;
-  for (const order of candidates) {
+  for (const order of queue) {
     const dedupeKey = feedbackMailKey(order.id);
     if (doneKeys.has(dedupeKey)) continue;
     const outOfTime = deps.deadline !== undefined && Date.now() > deps.deadline;
@@ -113,7 +119,8 @@ export async function submitFeedback(
   input: { orderId: string; key: string; rating: number; comment: string },
   now = new Date(),
 ): Promise<"saved" | "done" | "closed" | "invalid"> {
-  const comment = input.comment.trim();
+  // Nullzeichen lehnt Postgres ab; sie haben in einem Kommentar nichts zu suchen.
+  const comment = input.comment.replaceAll("\u0000", "").trim();
   if (
     !verifyFeedbackKey(input.orderId, input.key) ||
     !Number.isInteger(input.rating) ||

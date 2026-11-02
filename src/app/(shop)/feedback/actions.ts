@@ -33,7 +33,13 @@ export async function sendFeedback(
     comment: String(formData.get("comment") ?? ""),
   });
   if (!parsed.success) {
-    return { ok: false, message: "Bitte wähle 1 bis 5 Sterne." };
+    const tooLong = parsed.error.issues.some((i) => i.path[0] === "comment");
+    return {
+      ok: false,
+      message: tooLong
+        ? `Der Kommentar darf höchstens ${MAX_COMMENT_LENGTH} Zeichen haben.`
+        : "Bitte wähle 1 bis 5 Sterne.",
+    };
   }
   try {
     const result = await submitFeedback({ orderId, key, ...parsed.data });
