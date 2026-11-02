@@ -7,6 +7,7 @@ export type Role = "ADMIN" | "KITCHEN";
 export const PERMISSIONS = [
   "pizzas:manage",
   "drops:manage",
+  "coupons:manage",
   "orders:view",
   "orders:manage",
   "kitchen:use",

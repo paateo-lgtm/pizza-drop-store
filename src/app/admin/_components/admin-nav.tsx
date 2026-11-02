@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Pizza,
   Settings,
+  TicketPercent,
   Users,
   Wheat,
 } from "lucide-react";
@@ -43,6 +44,7 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
     items: [
       { href: "/admin/pizzen", label: "Pizzen", icon: Pizza },
       { href: "/admin/zutaten", label: "Zutaten", icon: Wheat },
+      { href: "/admin/gutscheine", label: "Gutscheine", icon: TicketPercent },
     ],
   },
   {
