@@ -13,26 +13,26 @@
 
 ## RED → GREEN
 
-| Schritt | RED | GREEN |
-| --- | --- | --- |
-| Domäne + Berliner Zeit | `5245d21`: vitest bricht ab, weil die Module `./time` und `./domain/drops` fehlen | `2c05857`: 46 neue Tests grün |
-| Formular-Validierung | vitest bricht ab, weil das Modul `./drop` fehlt | 9 Tests grün |
-| Nach dem Review: Slot-Obergrenze, laufender Slot, deutsche Fehlermeldung | „begrenzt das Raster auf … Slots“ und „meldet nicht-numerische Obergrenzen auf Deutsch“ schlagen fehl | 95 Unit-Tests grün |
+| Schritt                                                                  | RED                                                                                                   | GREEN                         |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------- |
+| Domäne + Berliner Zeit                                                   | `5245d21`: vitest bricht ab, weil die Module `./time` und `./domain/drops` fehlen                     | `2c05857`: 46 neue Tests grün |
+| Formular-Validierung                                                     | vitest bricht ab, weil das Modul `./drop` fehlt                                                       | 9 Tests grün                  |
+| Nach dem Review: Slot-Obergrenze, laufender Slot, deutsche Fehlermeldung | „begrenzt das Raster auf … Slots“ und „meldet nicht-numerische Obergrenzen auf Deutsch“ schlagen fehl | 95 Unit-Tests grün            |
 
 ## Was die Tests garantieren
 
-| # | Garantie | Test | Art |
-| --- | --- | --- | --- |
-| 1 | Ein geplanter Drop schaltet per Zeit weiter (geplant → Verkauf → geschlossen → läuft → abgeschlossen) und springt nie zurück. Entwurf und Absage bleiben stehen. | `src/lib/domain/drops.test.ts` › effectiveStatus | Unit |
-| 2 | Bis Verkaufsstart ist das Raster änderbar, danach fix | › isGridLocked | Unit |
-| 3 | Pro Status sind nur die vorgesehenen Aktionen erlaubt, unzulässige Übergänge geben `null` | › dropActions, statusAfter | Unit |
-| 4 | Vorschau: 15–20 Uhr bei 6 min = 50 Slots, erste Abholung 15:06, letzte 20:00; Obergrenze und Rest werden berücksichtigt | › describeGrid | Unit |
-| 5 | Unstimmige Zeiten, eine Obergrenze über der Slotanzahl und mehr als 500 Slots werden am jeweiligen Feld abgelehnt | › validateDropTimes | Unit |
-| 6 | Slot-Zustand: frei, reserviert (Zahlung läuft), verkauft, gesperrt; abgelaufene, stornierte oder erstattete Bestellungen geben den Slot frei | › slotStatus | Unit |
-| 7 | Sperren geht nur bei freien oder gesperrten Slots, die noch nicht begonnen haben, und nicht in beendeten Drops | › canToggleSlotBlock | Unit |
-| 8 | Berliner Zeit wird gelesen und ausgegeben (MEZ und MESZ), ungültige Daten werden abgelehnt; Verschieben um Tage behält die Uhrzeit über die Zeitumstellung | `src/lib/time.test.ts` | Unit |
-| 9 | Das Formular wird zu UTC, Sekunden und Cent umgerechnet; Pizza-Zeilen, Duplikate, Preise und Kontingente werden geprüft | `src/lib/validation/drop.test.ts` | Unit |
-| 10 | Anlegen mit Vorschau, Ablehnung einer zu hohen Obergrenze, Slot sperren (bleibt nach Neuladen erhalten), veröffentlichen und zurückziehen, duplizieren (die Kopie hat keine Sperren), löschen | `e2e/drops.spec.ts` (mobil und Desktop) | E2E |
+| #   | Garantie                                                                                                                                                                                      | Test                                             | Art  |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ---- |
+| 1   | Ein geplanter Drop schaltet per Zeit weiter (geplant → Verkauf → geschlossen → läuft → abgeschlossen) und springt nie zurück. Entwurf und Absage bleiben stehen.                              | `src/lib/domain/drops.test.ts` › effectiveStatus | Unit |
+| 2   | Bis Verkaufsstart ist das Raster änderbar, danach fix                                                                                                                                         | › isGridLocked                                   | Unit |
+| 3   | Pro Status sind nur die vorgesehenen Aktionen erlaubt, unzulässige Übergänge geben `null`                                                                                                     | › dropActions, statusAfter                       | Unit |
+| 4   | Vorschau: 15–20 Uhr bei 6 min = 50 Slots, erste Abholung 15:06, letzte 20:00; Obergrenze und Rest werden berücksichtigt                                                                       | › describeGrid                                   | Unit |
+| 5   | Unstimmige Zeiten, eine Obergrenze über der Slotanzahl und mehr als 500 Slots werden am jeweiligen Feld abgelehnt                                                                             | › validateDropTimes                              | Unit |
+| 6   | Slot-Zustand: frei, reserviert (Zahlung läuft), verkauft, gesperrt; abgelaufene, stornierte oder erstattete Bestellungen geben den Slot frei                                                  | › slotStatus                                     | Unit |
+| 7   | Sperren geht nur bei freien oder gesperrten Slots, die noch nicht begonnen haben, und nicht in beendeten Drops                                                                                | › canToggleSlotBlock                             | Unit |
+| 8   | Berliner Zeit wird gelesen und ausgegeben (MEZ und MESZ), ungültige Daten werden abgelehnt; Verschieben um Tage behält die Uhrzeit über die Zeitumstellung                                    | `src/lib/time.test.ts`                           | Unit |
+| 9   | Das Formular wird zu UTC, Sekunden und Cent umgerechnet; Pizza-Zeilen, Duplikate, Preise und Kontingente werden geprüft                                                                       | `src/lib/validation/drop.test.ts`                | Unit |
+| 10  | Anlegen mit Vorschau, Ablehnung einer zu hohen Obergrenze, Slot sperren (bleibt nach Neuladen erhalten), veröffentlichen und zurückziehen, duplizieren (die Kopie hat keine Sperren), löschen | `e2e/drops.spec.ts` (mobil und Desktop)          | E2E  |
 
 ## Befehle und Ergebnisse (zuletzt ausgeführt)
 

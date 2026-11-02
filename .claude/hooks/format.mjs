@@ -4,8 +4,10 @@ import { readFileSync } from "node:fs";
 
 const input = JSON.parse(readFileSync(0, "utf8"));
 const file = input.tool_input?.file_path;
-if (!file || !/\.(ts|tsx|js|mjs|json|css|md|ya?ml)$/.test(file)) process.exit(0);
-if (/node_modules|[\\/]\.next[\\/]|[\\/]generated[\\/]/.test(file)) process.exit(0);
+if (!file || !/\.(ts|tsx|js|mjs|json|css|md|ya?ml)$/.test(file))
+  process.exit(0);
+if (/node_modules|[\\/]\.next[\\/]|[\\/]generated[\\/]/.test(file))
+  process.exit(0);
 try {
   execFileSync("npx", ["prettier", "--write", "--log-level", "warn", file], {
     cwd: input.cwd,

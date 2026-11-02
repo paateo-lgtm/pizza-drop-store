@@ -5,7 +5,8 @@ import { basename } from "node:path";
 
 const input = JSON.parse(readFileSync(0, "utf8"));
 const tool = input.tool_input ?? {};
-const isEnv = (name) => /^\.env(\..+)?$/.test(name) && !name.endsWith(".example");
+const isEnv = (name) =>
+  /^\.env(\..+)?$/.test(name) && !name.endsWith(".example");
 
 const file = tool.file_path ?? tool.path;
 const command = tool.command ?? "";
