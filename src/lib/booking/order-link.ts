@@ -30,5 +30,17 @@ export function verifyOrderKey(
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
+export function feedbackKey(_orderId: string, _secret = linkSecret()): string {
+  throw new Error("noch nicht umgesetzt");
+}
+
+export function verifyFeedbackKey(
+  _orderId: string,
+  _key: string | undefined,
+  _secret = linkSecret(),
+): boolean {
+  throw new Error("noch nicht umgesetzt");
+}
+
 export const orderPath = (orderId: string) =>
   `/bestellung/${orderId}?k=${orderKey(orderId)}`;

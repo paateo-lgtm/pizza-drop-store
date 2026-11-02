@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { orderKey, verifyOrderKey } from "./order-link";
+import {
+  feedbackKey,
+  orderKey,
+  verifyFeedbackKey,
+  verifyOrderKey,
+} from "./order-link";
 
 const secret = "test-secret-mit-mindestens-32-zeichen-laenge";
 
@@ -24,5 +29,17 @@ describe("Bestell-Link", () => {
 
   it("verlangt ein ausreichend langes Secret", () => {
     expect(() => orderKey("order1", "zu-kurz")).toThrow();
+  });
+});
+
+describe("Feedback-Link", () => {
+  it("hat einen eigenen Schlüssel: Der Bestell-Link öffnet kein Feedback und umgekehrt", () => {
+    const feedback = feedbackKey("order1", secret);
+    expect(verifyFeedbackKey("order1", feedback, secret)).toBe(true);
+    expect(verifyFeedbackKey("order2", feedback, secret)).toBe(false);
+    expect(
+      verifyFeedbackKey("order1", orderKey("order1", secret), secret),
+    ).toBe(false);
+    expect(verifyOrderKey("order1", feedback, secret)).toBe(false);
   });
 });
