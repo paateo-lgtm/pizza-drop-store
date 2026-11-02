@@ -32,3 +32,4 @@ Stack: Next.js 16 (siehe `AGENTS.md`, Doku unter `node_modules/next/dist/docs/`)
 - Prisma-Indizes mit `ops: raw(...)` erscheinen bei jedem Abgleich als Abweichung, also vermeiden.
 - Sperrreihenfolge in Transaktionen: erst `lockDrop`, dann `lockCoupon` (`src/lib/tx.ts`).
 - Persönliche Links (`?k=`, `?t=`) brauchen `Referrer-Policy: no-referrer` in `next.config.ts`; ausgelöst wird nur per Knopf (POST), nie beim Öffnen.
+- `npm install` unter Windows streicht plattformabhängige Einträge (`@emnapi/*`) aus `package-lock.json`, dann scheitert `npm ci` in der CI. Nach jeder Änderung an den Abhängigkeiten den Workflow „Lockfile erneuern“ starten (`gh workflow run lockfile.yml`), das Artefakt mit `gh run download --name package-lock` holen und committen. Ein lokal umgeschriebenes Lockfile nicht committen.
