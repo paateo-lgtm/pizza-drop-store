@@ -82,6 +82,7 @@ export async function loadReport(filter: ReportFilter): Promise<Report> {
 
 export type DropReport = Report & {
   drop: { id: string; title: string; bakeStartsAt: Date; saleStartsAt: Date };
+  capacity: number;
   points: SalesPoint[];
   soldOutAfterMs: number | null;
 };
@@ -117,7 +118,7 @@ export async function loadDropReport(
       .filter((o) => !isCancelled(o.status))
       .map((o) => ({ paidAt: o.paidAt!, pizzas: pizzaCount(o) })),
   );
-  return { drop, ...toReport(orders), ...curve };
+  return { drop, capacity, ...toReport(orders), ...curve };
 }
 
 const day = new Intl.DateTimeFormat("de-DE", {

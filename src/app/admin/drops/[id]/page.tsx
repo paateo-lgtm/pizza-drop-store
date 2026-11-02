@@ -124,6 +124,12 @@ async function DropDetail({
         >
           Küchen-Board
         </Link>
+        <Link
+          href={`/admin/reporting/drops/${drop.id}`}
+          className="text-sm text-olive underline-offset-4 hover:underline"
+        >
+          Bericht
+        </Link>
       </div>
 
       <dl className="mb-10 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-[var(--line)] md:grid-cols-4">

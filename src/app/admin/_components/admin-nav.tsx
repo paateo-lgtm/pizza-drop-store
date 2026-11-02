@@ -56,7 +56,6 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
         href: "/admin/reporting",
         label: "Reporting",
         icon: BarChart3,
-        phase: 8,
       },
       { href: "/admin/feedback", label: "Feedback", icon: MessageSquareText },
     ],
