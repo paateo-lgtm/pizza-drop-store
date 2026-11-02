@@ -40,28 +40,36 @@ export function summarizeOrders(orders: ReportOrder[]): Kpis {
   let refunded = 0;
   let pickedUp = 0;
   let noShow = 0;
+  let soldCents = 0;
   for (const o of orders) {
-    const kept = o.totalCents - o.refundedCents;
+    if (o.refundedCents > 0) refunded++;
+    // Erstattungen bei nicht stornierten Bestellungen gelten heute nur Doppelzahlungen
+    // (zweites Geld rein und wieder raus) und ändern den Umsatz nicht.
+    // chisle: bei Teilerstattungen auf aktive Bestellungen braucht Refund eine Art.
+    const cancelledOrder = isCancelled(o.status);
+    const kept = cancelledOrder
+      ? o.totalCents - o.refundedCents
+      : o.totalCents;
     grossCents += kept;
     netCents +=
       kept -
       (o.totalCents === 0 ? 0 : Math.round((o.vatCents * kept) / o.totalCents));
-    if (o.refundedCents > 0) refunded++;
-    if (isCancelled(o.status)) {
+    if (cancelledOrder) {
       cancelled++;
       continue;
     }
+    soldCents += kept;
     pizzas += o.pizzas;
     if (o.status === "PICKED_UP") pickedUp++;
     if (o.status === "NO_SHOW") noShow++;
   }
-  const kept = orders.length - cancelled;
+  const sold = orders.length - cancelled;
   return {
     orders: orders.length,
     pizzas,
     grossCents,
     netCents,
-    avgOrderCents: kept === 0 ? 0 : Math.round(grossCents / kept),
+    avgOrderCents: sold === 0 ? 0 : Math.round(soldCents / sold),
     cancelRate: ratio(cancelled, orders.length),
     refundRate: ratio(refunded, orders.length),
     noShowRate: ratio(noShow, pickedUp + noShow),
@@ -208,6 +216,56 @@ export type ExportOrder = {
 export function exportTable(
   orders: ExportOrder[],
 ): (string | number | null)[][] {
-  void orders;
-  throw new Error("not implemented");
+  const header = [
+    "Bestellung",
+    "Drop",
+    "Backtag",
+    "Status",
+    "Bezahlt",
+    "Pizza",
+    "Menge",
+    "Einzelpreis €",
+    "Zeilensumme €",
+    "Rabatt €",
+    "Summe €",
+    "Erstattet €",
+  ];
+  return [
+    header,
+    ...orders.flatMap((o) =>
+      o.items.map((i, index) => [
+        o.number,
+        o.dropTitle,
+        csvDay.format(o.bakeStartsAt),
+        o.status,
+        `${csvDay.format(o.paidAt)} ${csvTime.format(o.paidAt)}`,
+        i.name,
+        i.quantity,
+        csvEuro(i.unitPriceCents),
+        csvEuro(i.quantity * i.unitPriceCents),
+        index === 0 ? csvEuro(o.discountCents) : null,
+        index === 0 ? csvEuro(o.totalCents) : null,
+        index === 0 ? csvEuro(o.refundedCents) : null,
+      ]),
+    ),
+  ];
 }
+
+const csvDay = new Intl.DateTimeFormat("de-DE", {
+  timeZone: TIME_ZONE,
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+const csvTime = new Intl.DateTimeFormat("de-DE", {
+  timeZone: TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+});
+/** 1234,50 – ohne Tausenderpunkt, damit Excel (DE) eine Zahl erkennt */
+const csvEuro = (cents: number) =>
+  (cents / 100).toLocaleString("de-DE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: false,
+  });

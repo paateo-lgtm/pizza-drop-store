@@ -44,11 +44,17 @@ async function Dashboard({
     loadReport(filter),
     db.drop.findMany({
       where: {
-        orders: { some: { paidAt: { not: null } } },
-        bakeStartsAt: {
-          ...(filter.from && { gte: filter.from }),
-          ...(filter.to && { lt: filter.to }),
-        },
+        OR: [
+          // Der gewählte Drop bleibt auswählbar, auch außerhalb des Zeitraums
+          ...(filter.dropId ? [{ id: filter.dropId }] : []),
+          {
+            orders: { some: { paidAt: { not: null } } },
+            bakeStartsAt: {
+              ...(filter.from && { gte: filter.from }),
+              ...(filter.to && { lt: filter.to }),
+            },
+          },
+        ],
       },
       orderBy: { bakeStartsAt: "desc" },
       take: 50,

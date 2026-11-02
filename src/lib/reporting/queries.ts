@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import {
+  exportTable,
   isCancelled,
   salesCurve,
   summarizeOrders,
@@ -11,7 +12,6 @@ import {
   type ReportFilter,
   type SalesPoint,
 } from "@/lib/domain/reporting";
-import { TIME_ZONE } from "@/lib/time";
 
 export type Report = { kpis: Kpis; pizzas: PizzaRow[] };
 
@@ -44,6 +44,9 @@ const ORDER_SELECT = {
 
 type LoadedOrder = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
 
+const refundedCents = (o: Pick<LoadedOrder, "refunds">) =>
+  o.refunds.reduce((s, r) => s + r.amountCents, 0);
+
 const pizzaCount = (o: LoadedOrder) =>
   o.items.reduce((s, i) => s + i.quantity, 0);
 
@@ -53,7 +56,7 @@ function toReport(orders: LoadedOrder[]): Report {
       status: o.status,
       totalCents: o.totalCents,
       vatCents: o.vatCents,
-      refundedCents: o.refunds.reduce((s, r) => s + r.amountCents, 0),
+      refundedCents: refundedCents(o),
       pizzas: pizzaCount(o),
     })),
   );
@@ -121,18 +124,6 @@ export async function loadDropReport(
   return { drop, capacity, ...toReport(orders), ...curve };
 }
 
-const day = new Intl.DateTimeFormat("de-DE", {
-  timeZone: TIME_ZONE,
-  dateStyle: "medium",
-});
-const dateTime = new Intl.DateTimeFormat("de-DE", {
-  timeZone: TIME_ZONE,
-  dateStyle: "short",
-  timeStyle: "short",
-});
-const euro = (cents: number) =>
-  (cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 });
-
 /** CSV-Zeilen: eine Zeile pro Bestellposition, ohne Kontaktdaten */
 export async function exportRows(
   filter: ReportFilter,
@@ -147,36 +138,21 @@ export async function exportRows(
       drop: { select: { title: true, bakeStartsAt: true } },
     },
   });
-  const header = [
-    "Bestellung",
-    "Drop",
-    "Backtag",
-    "Status",
-    "Bezahlt",
-    "Pizza",
-    "Menge",
-    "Einzelpreis €",
-    "Rabatt €",
-    "Summe €",
-    "Erstattet €",
-  ];
-  return [
-    header,
-    ...orders.flatMap((o) => {
-      const refunded = o.refunds.reduce((s, r) => s + r.amountCents, 0);
-      return o.items.map((i) => [
-        o.number,
-        o.drop.title,
-        day.format(o.drop.bakeStartsAt),
-        o.status,
-        dateTime.format(o.paidAt!),
-        i.nameSnapshot,
-        i.quantity,
-        euro(i.unitPriceCents),
-        euro(o.discountCents),
-        euro(o.totalCents),
-        euro(refunded),
-      ]);
-    }),
-  ];
+  return exportTable(
+    orders.map((o) => ({
+      number: o.number,
+      dropTitle: o.drop.title,
+      bakeStartsAt: o.drop.bakeStartsAt,
+      status: o.status,
+      paidAt: o.paidAt!,
+      discountCents: o.discountCents,
+      totalCents: o.totalCents,
+      refundedCents: refundedCents(o),
+      items: o.items.map((i) => ({
+        name: i.nameSnapshot,
+        quantity: i.quantity,
+        unitPriceCents: i.unitPriceCents,
+      })),
+    })),
+  );
 }

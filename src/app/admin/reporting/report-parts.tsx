@@ -103,6 +103,12 @@ export function PizzaTable({ pizzas }: { pizzas: PizzaRow[] }) {
   );
 }
 
+const shortDate = new Intl.DateTimeFormat("de-DE", {
+  day: "numeric",
+  month: "numeric",
+  timeZone: "Europe/Berlin",
+});
+
 const W = 600;
 const H = 200;
 const PAD = { top: 12, right: 12, bottom: 8, left: 44 };
@@ -128,6 +134,11 @@ export function SalesChart({
     )
     .join("");
   const last = points[points.length - 1];
+  // Über mehr als einen Tag reicht die Uhrzeit allein nicht
+  const tick = (d: Date) =>
+    end - start > 86_400_000
+      ? `${shortDate.format(d)} ${formatTime(d)}`
+      : formatTime(d);
 
   return (
     <figure>
@@ -204,13 +215,30 @@ export function SalesChart({
         className="flex justify-between text-xs text-ink-muted tabular-nums"
         style={{ paddingLeft: `${(PAD.left / W) * 100}%` }}
       >
-        <span>{formatTime(new Date(start))}</span>
-        <span>{formatTime(new Date(end))}</span>
+        <span>{tick(new Date(start))}</span>
+        <span>{tick(new Date(end))}</span>
       </div>
       <figcaption className="mt-2 text-xs text-ink-muted">
         Kumuliert nach Zahlungszeit, ab Verkaufsstart. Gestrichelt: Kapazität (
         {capacity} Pizzen).
       </figcaption>
+      <table className="sr-only">
+        <caption>Verkaufsverlauf als Tabelle</caption>
+        <thead>
+          <tr>
+            <th scope="col">Zeit</th>
+            <th scope="col">Verkauft (kumuliert)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {points.slice(1).map((p, i) => (
+            <tr key={i}>
+              <td>{tick(p.at)}</td>
+              <td>{p.pizzas}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </figure>
   );
 }
