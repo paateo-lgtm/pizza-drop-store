@@ -97,6 +97,19 @@ describe("loadDropReport", () => {
     expect(report?.soldOutAfterMs).toBeNull();
   });
 
+  it("Kapazität beachtet die Höchstmenge des Drops (wie die Drop-Seite)", async () => {
+    await db.drop.update({
+      where: { id: dropA.id },
+      data: { maxPizzasTotal: 2 },
+    });
+    const report = await loadDropReport(dropA.id);
+    expect(report?.soldOutAfterMs).toBe(5 * 60_000);
+    await db.drop.update({
+      where: { id: dropA.id },
+      data: { maxPizzasTotal: null },
+    });
+  });
+
   it("null für unbekannte Drops", async () => {
     expect(await loadDropReport("gibt-es-nicht")).toBeNull();
   });
