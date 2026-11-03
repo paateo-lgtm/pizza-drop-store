@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
+import { subscribe } from "@/lib/marketing/drop-alert";
 import {
   cleanupPersonalData,
   EMAIL_LOG_DAYS,
@@ -95,5 +96,20 @@ describe("cleanupPersonalData", () => {
     expect(
       await db.subscriber.count({ where: { email: { startsWith: RUN } } }),
     ).toBe(3);
+  });
+
+  it("eine erneute Anmeldung nach langer Zeit gilt als neu und bleibt", async () => {
+    // Abgemeldet vor über einem Jahr, jetzt wieder angemeldet (noch nicht bestätigt)
+    await subscribe(email("abgemeldet"), { sendConfirm: async () => {} });
+    expect(
+      await db.subscriber.findUnique({
+        where: { email: email("abgemeldet") },
+        select: { status: true },
+      }),
+    ).toEqual({ status: "PENDING" });
+    await cleanupPersonalData(new Date());
+    expect(
+      await db.subscriber.count({ where: { email: email("abgemeldet") } }),
+    ).toBe(1);
   });
 });
