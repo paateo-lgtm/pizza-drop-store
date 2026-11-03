@@ -42,6 +42,10 @@ test.describe("Reporting", () => {
       await page.getByLabel("Passwort").fill(password);
       await page.getByRole("button", { name: "Anmelden" }).click();
       await expect(page).toHaveURL(/\/admin\/reporting\?drop=/);
+      // Alle Menüpunkte sind umgesetzt, keiner ist mehr gedimmt
+      await expect(
+        page.getByRole("link", { name: "Kitchen-Mode" }),
+      ).toHaveAttribute("href", "/kitchen");
 
       const orders = page
         .getByRole("term")

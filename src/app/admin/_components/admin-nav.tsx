@@ -23,8 +23,6 @@ type Item = {
   href: string;
   label: string;
   icon: typeof Pizza;
-  /** Noch nicht umgesetzt: wird gedimmt und ohne Link angezeigt. */
-  phase?: number;
 };
 
 const SECTIONS: { title?: string; items: Item[] }[] = [
@@ -38,7 +36,7 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
         label: "Bestellungen",
         icon: ClipboardList,
       },
-      { href: "/kitchen", label: "Kitchen-Mode", icon: ChefHat, phase: 5 },
+      { href: "/kitchen", label: "Kitchen-Mode", icon: ChefHat },
     ],
   },
   {
@@ -97,41 +95,19 @@ function NavItems({ pathname }: { pathname: string }) {
                   ? pathname === "/admin"
                   : pathname.startsWith(item.href);
               const Icon = item.icon;
-              const content = (
-                <>
-                  <Icon className="size-4" aria-hidden />
-                  <span className="flex-1">{item.label}</span>
-                  {item.phase && (
-                    <span className="text-[10px] text-ink-muted tabular-nums">
-                      Phase {item.phase}
-                    </span>
-                  )}
-                </>
-              );
-              const base =
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm";
               return (
                 <li key={item.href}>
-                  {item.phase ? (
-                    <span
-                      className={cn(base, "cursor-default text-ink-muted/70")}
-                      aria-disabled
-                    >
-                      {content}
-                    </span>
-                  ) : (
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        base,
-                        "transition-colors hover:bg-wash",
-                        active && "bg-olive-soft font-medium text-olive-deep",
-                      )}
-                    >
-                      {content}
-                    </Link>
-                  )}
+                  <Link
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-wash",
+                      active && "bg-olive-soft font-medium text-olive-deep",
+                    )}
+                  >
+                    <Icon className="size-4" aria-hidden />
+                    <span className="flex-1">{item.label}</span>
+                  </Link>
                 </li>
               );
             })}
