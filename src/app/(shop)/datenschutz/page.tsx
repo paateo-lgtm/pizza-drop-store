@@ -104,7 +104,8 @@ async function Privacy() {
         zur Bestätigung (Double-Opt-in). Erst danach informieren wir dich, wenn
         ein neuer Drop in den Verkauf geht. Wir speichern deine E-Mail-Adresse,
         den Zeitpunkt der Anmeldung und der Bestätigung sowie die Version des
-        Einwilligungstexts als Nachweis. Rechtsgrundlage ist deine Einwilligung
+        Einwilligungstexts als Nachweis. Bestätigst du die Anmeldung nicht,
+        löschen wir sie nach 30 Tagen. Rechtsgrundlage ist deine Einwilligung
         (Art. 6 Abs. 1 lit. a DSGVO). Du kannst sie jederzeit über den Link in
         jeder Mail widerrufen; danach schreiben wir dir nicht mehr. Adresse und
         Zeitpunkt des Widerrufs behalten wir als Nachweis, dass wir ihn
@@ -139,7 +140,7 @@ async function Privacy() {
         welche Mail an welche Adresse ging, um Doppelversand zu vermeiden und
         den Versand nachweisen zu können (Art. 6 Abs. 1 lit. f DSGVO). Das
         Protokoll enthält nur Art, Empfängeradresse und Zeitpunkt, nicht den
-        Inhalt der Mail.
+        Inhalt der Mail; nach 90 Tagen löschen wir es.
       </p>
 
       <h2>11. Hosting und Datenbank</h2>

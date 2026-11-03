@@ -67,11 +67,17 @@ export function sendWaitlistMail(mail: WaitlistNotice) {
 export function sendFeedbackMail(mail: FeedbackRequest) {
   const url = `${appUrl()}${mail.feedbackPath}`;
   const [path, query] = mail.feedbackPath.split("?");
+  const oneClick = `${appUrl()}/api/feedback/abmelden?o=${encodeURIComponent(mail.orderId)}&${query}`;
   return sendMail({
     kind: "feedback",
     to: mail.to,
     dedupeKey: mail.dedupeKey,
     subject: `Wie war deine Pizza? · Nr. ${mail.orderNumber}`,
+    // Widerspruch mit einem Klick direkt im Mailprogramm (RFC 8058)
+    headers: {
+      "List-Unsubscribe": `<${oneClick}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
     react: createElement(NoticeMail, {
       preview: "Ein Klick auf die Sterne genügt.",
       heading: "Wie hat es dir geschmeckt?",
