@@ -80,6 +80,8 @@ export async function subscribe(
         confirmedAt: null,
         unsubscribedAt: null,
         source: origin,
+        // Neue Anmeldung: Die 30-Tage-Frist des Aufräum-Crons beginnt von vorn
+        createdAt: new Date(),
       },
     });
   } else {
