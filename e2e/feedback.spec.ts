@@ -93,6 +93,28 @@ test.describe("Feedback", () => {
     expect(rows).toEqual([{ feedbackConsent: false }]);
   });
 
+  test("One-Click-Widerspruch aus dem Mailprogramm nur per POST", async ({
+    request,
+  }) => {
+    const path = `/api/feedback/abmelden?o=${orderId}&k=${feedbackKey(orderId)}`;
+    const consent = async () =>
+      (
+        await pool.query(
+          `SELECT "feedbackConsent" FROM "Order" WHERE id = $1`,
+          [orderId],
+        )
+      ).rows[0].feedbackConsent;
+    expect((await request.get(path)).status()).toBe(405);
+    expect(await consent()).toBe(true);
+    expect(
+      (
+        await request.post(`/api/feedback/abmelden?o=${orderId}&k=falsch`)
+      ).status(),
+    ).toBe(404);
+    expect((await request.post(path)).status()).toBe(200);
+    expect(await consent()).toBe(false);
+  });
+
   test("der Cron-Endpunkt verlangt den Schlüssel", async ({ request }) => {
     expect((await request.get("/api/cron/feedback")).status()).toBe(401);
     const ok = await request.get("/api/cron/feedback", {
