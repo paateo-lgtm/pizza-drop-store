@@ -90,16 +90,16 @@ Folgt in 8b:
 
 ## Review-Befunde
 
-| Befund                                                                | Schwere | Ergebnis                                           |
-| --------------------------------------------------------------------- | ------- | -------------------------------------------------- |
-| Erstattung einer Doppelzahlung setzte den Umsatz der Bestellung auf 0 | HIGH    | behoben (`8e07167`)                                |
-| Gewählter Drop fehlte in der Auswahl, wenn außerhalb des Zeitraums    | MEDIUM  | behoben                                            |
-| CSV: Bestellsummen in jeder Positionszeile                            | MEDIUM  | behoben                                            |
-| Chart für Screenreader nicht erschließbar                             | MEDIUM  | behoben (sr-only-Tabelle)                          |
-| Zeitachse ohne Datum bei mehrtägigem Verkauf                          | MEDIUM  | behoben                                            |
-| Export ohne Recht: Umleitung statt 403                                | LOW     | belassen, wie im übrigen Admin                     |
-| Laden und Export ohne Obergrenze                                      | LOW     | belassen, bei Shop-Volumen unkritisch              |
-| `OrderItem.orderId` und `Refund.orderId` ohne Index                   | LOW–MED | offen, braucht eine Migration (Nutzerentscheidung) |
+| Befund                                                                | Schwere | Ergebnis                                                          |
+| --------------------------------------------------------------------- | ------- | ----------------------------------------------------------------- |
+| Erstattung einer Doppelzahlung setzte den Umsatz der Bestellung auf 0 | HIGH    | behoben (`8e07167`)                                               |
+| Gewählter Drop fehlte in der Auswahl, wenn außerhalb des Zeitraums    | MEDIUM  | behoben                                                           |
+| CSV: Bestellsummen in jeder Positionszeile                            | MEDIUM  | behoben                                                           |
+| Chart für Screenreader nicht erschließbar                             | MEDIUM  | behoben (sr-only-Tabelle)                                         |
+| Zeitachse ohne Datum bei mehrtägigem Verkauf                          | MEDIUM  | behoben                                                           |
+| Export ohne Recht: Umleitung statt 403                                | LOW     | belassen, wie im übrigen Admin                                    |
+| Laden und Export ohne Obergrenze                                      | LOW     | belassen, bei Shop-Volumen unkritisch                             |
+| `OrderItem.orderId` und `Refund.orderId` ohne Index                   | LOW–MED | behoben, Migration `20261103072549_order_item_refund_order_index` |
 
 ## Ergebnis
 
